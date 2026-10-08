@@ -11,12 +11,20 @@ import { jobDiscoveryService } from '../services/jobDiscoveryService'
 import { emailVerificationService } from '../services/emailVerificationService'
 import { companyResearchService } from '../services/companyResearchService'
 import { contactDiscoveryService } from '../services/contactDiscoveryService'
+import { DISCOVERY_STEPS } from '../constants/discovery'
 
 interface ToastState {
   id: string
   title: string
   message: string
   type: 'success' | 'info' | 'warning' | 'error'
+}
+
+export interface DiscoveryRunParams {
+  query?: string
+  location?: string
+  sites?: string[]
+  hoursOld?: number
 }
 
 interface AppContextType {
@@ -53,13 +61,14 @@ interface AppContextType {
   closePrototypeBrief: () => void
   openDiscoveryModal: () => void
   closeDiscoveryModal: () => void
-  runDiscovery: (query?: string) => Promise<void>
+  runDiscovery: (params?: string | DiscoveryRunParams) => Promise<void>
   verifyContactEmail: (contactId: string, email: string) => Promise<boolean>
   updateOutreachStatus: (id: string, status: OutreachStatus) => void
   saveOutreachRecord: (outreach: Outreach) => void
   getCompanyById: (id: string) => Company | undefined
   getContactById: (id: string) => Contact | undefined
   getOpportunityById: (id: string) => Opportunity | undefined
+  updateContact: (contactId: string, updates: Partial<Contact>) => void
   clearAllData: () => void
 }
 
@@ -271,45 +280,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [isDiscovering])
 
-  // Real-Time Discovery Execution
-  const runDiscovery = useCallback(async (query?: string) => {
+  // Real-Time Discovery Execution via Pure JobSpy Engine
+  const runDiscovery = useCallback(async (paramsOrQuery?: string | DiscoveryRunParams) => {
     setIsDiscovering(true)
     setIsDiscoveryModalOpen(true)
     setDiscoveryStep(1)
     setDiscoveryStepsCompleted([])
-    setDiscoveryStatusText('Initiating live multi-source scrape...')
+    setDiscoveryStatusText('Initiating live JobSpy multi-source scrape...')
 
-    const steps = [
-      'Connecting to Indian IT hubs & tech pipelines (Bengaluru, Hyderabad, Pune, NCR, Mumbai)',
-      'Scraping live engineering and product vacancies across Indian tech companies & startups',
-      'Filtering early-career, MCA, and React/Node/Full Stack roles',
-      'Extracting hiring manager & recruiter decision makers',
-      'Executing RFC-5321 DNS MX mailbox verification via dnspython',
-      'Calculating dynamic match scores against candidate credentials',
-    ]
+    const steps = DISCOVERY_STEPS
 
     try {
       // Step 1
-      setDiscoveryStepsCompleted((p) => [...p, steps[0]])
+      setDiscoveryStepsCompleted([steps[0]])
       setDiscoveryStep(2)
 
       // Step 2 & 3
-      setDiscoveryStatusText('Scraping live feeds in real time...')
-      const result = await jobDiscoveryService.runDiscovery(query, (msg) => {
+      setDiscoveryStatusText('Scraping live tech feeds via JobSpy in real time...')
+      const result = await jobDiscoveryService.runDiscovery(paramsOrQuery, (msg) => {
         setDiscoveryStatusText(msg)
       })
 
-      setDiscoveryStepsCompleted((p) => [...p, steps[1], steps[2]])
+      setDiscoveryStepsCompleted([steps[0], steps[1], steps[2]])
       setDiscoveryStep(4)
 
       // Step 4
-      setDiscoveryStatusText('Extracting verified decision makers...')
-      setDiscoveryStepsCompleted((p) => [...p, steps[3]])
+      setDiscoveryStatusText('Extracting verified decision makers via JobSpy...')
+      setDiscoveryStepsCompleted([steps[0], steps[1], steps[2], steps[3]])
       setDiscoveryStep(5)
 
       // Step 5 & 6
-      setDiscoveryStatusText('Running RFC-5321 DNS verification & scoring match...')
-      setDiscoveryStepsCompleted((p) => [...p, steps[4], steps[5]])
+      setDiscoveryStatusText('Running RFC-5321 DNS verification & scoring candidate fit...')
+      setDiscoveryStepsCompleted([...DISCOVERY_STEPS])
       setDiscoveryStep(6)
 
       // Commit discovered real data
@@ -330,8 +332,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const newActivity: SystemActivity = {
           id: `act-${Date.now()}`,
-          title: 'Live Real-Time Scrape Completed',
-          description: `Discovered ${result.discoveredCount} live tech postings from ${result.sources.join(', ')}. Scored ${result.strongMatchesCount} strong matches with ${result.contactsCount} verified contacts.`,
+          title: 'JobSpy Live Scrape Completed',
+          description: `Discovered ${result.discoveredCount} live tech postings via JobSpy from ${result.sources.join(', ')}. Scored ${result.strongMatchesCount} strong matches with ${result.contactsCount} verified contacts.`,
           timestamp: 'Just now',
           timestampMs: Date.now(),
           type: 'discovery',
@@ -339,8 +341,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSystemActivities((prev) => [newActivity, ...prev])
 
         showToast(
-          'Live Scraping Complete',
-          `Scraped ${result.discoveredCount} live opportunities in real time from ${result.sources.length} sources.`,
+          'JobSpy Scraping Complete',
+          `Scraped ${result.discoveredCount} live opportunities in real time via JobSpy from ${result.sources.length} boards.`,
           'success'
         )
       } else {
@@ -355,6 +357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Scraping Error', error.message || 'Failed to fetch live job feeds.', 'error')
     } finally {
       setIsDiscovering(false)
+      setDiscoveryStepsCompleted([...DISCOVERY_STEPS])
     }
   }, [showToast])
 
@@ -446,6 +449,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('All Data Cleared', 'Pipeline wiped completely. Ready for a clean scrape from scratch.', 'info')
   }, [showToast])
 
+  const updateContact = useCallback((contactId: string, updates: Partial<Contact>) => {
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, ...updates } : c))
+    )
+    setActiveContactDrawer((prev) =>
+      prev && prev.id === contactId ? { ...prev, ...updates } : prev
+    )
+  }, [])
+
   return (
     <AppContext.Provider
       value={{
@@ -485,6 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getCompanyById,
         getContactById,
         getOpportunityById,
+        updateContact,
         clearAllData,
       }}
     >

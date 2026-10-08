@@ -30,12 +30,18 @@ export interface PrototypeIdea {
 }
 
 export interface EligibilityCriteria {
-  eligibleDegrees: string[] // e.g. ['MCA', 'BCA', 'B.Tech', 'BE', 'CS Graduate']
-  experienceRange: string // e.g. 'Freshers / 0–2 years'
-  eligibleBatches: string[] // e.g. ['2024', '2025', '2026 Batch']
-  minMatchPercent: number // e.g. 75
-  isEligible: boolean // true for candidate
-  summary: string // e.g. 'Eligible: MCA / Freshers & 0–2 Yrs'
+  degrees: string[]
+  experienceYears: string
+  batch: string[]
+  isEligible: boolean
+  eligibilitySummary?: string
+  matchReason?: string
+  degreeEligible?: boolean
+  experienceEligible?: boolean
+  batchEligible?: boolean
+  minExp?: number
+  maxExp?: number
+  reason?: string
 }
 
 export interface Opportunity {
@@ -47,39 +53,35 @@ export interface Opportunity {
   role: string
   description: string
   location: string
-  remote: boolean
-  experience: 'Internship' | 'Fresher' | '0–1 years' | '0–2 years' | '1–2 years' | '2–3 years'
+  remote?: boolean
+  experience: string // e.g. "Fresher", "0–2 years", "1–3 years", "3–5 years", "5+ years", "Internship"
+  minExpYears?: number
+  maxExpYears?: number
   employmentType: 'Full-time' | 'Internship' | 'Contract'
   technologies: string[]
   education: string[]
-  postedDate: string // e.g. "Today at 02:15 PM" or "Oct 8, 2026"
-  postedRelative?: string // e.g. "2 hours ago", "Today"
+  postedDate: string // e.g. "Today at 07:15 PM"
   postedTimestamp: number
-  source:
-    | 'LinkedIn Jobs'
-    | 'Wellfound'
-    | 'Careers Page'
-    | 'X / Twitter'
-    | 'Cutshort'
-    | 'Y Combinator'
-    | 'Hacker News'
-    | 'Arbeitnow'
-    | 'RemoteOK'
-    | 'Jobicy'
-    | string
+  postedTimeFormatted?: string // e.g. "Oct 8, 2026 • 07:15 PM"
+  source: string
   sourceUrl: string
   matchScore: number
   matchBreakdown: MatchBreakdown
   contactId?: string
   status: JobStatus
-  salaryRange: string // e.g. "₹14 LPA – ₹22 LPA"
-  salaryLpaMin?: number // e.g. 14
-  salaryLpaMax?: number // e.g. 22
-  eligibility: EligibilityCriteria
+  salaryRange: string // e.g. "₹12 – 18 LPA"
+  salaryLpa?: number // numeric LPA value for filtering/sorting
+  salaryMinLpa?: number
+  salaryMaxLpa?: number
+  eligibility?: EligibilityCriteria
+  isFamousCompany?: boolean
+  companyTier?: 'Unicorn' | 'Tier-1 Tech' | 'Growth Leader' | 'Global Tech'
   requirements: string[]
   niceToHave: string[]
   prototypeIdea: PrototypeIdea
   isMockData?: boolean
+  jobspySite?: string
+  directUrl?: string
 }
 
 
@@ -100,6 +102,13 @@ export interface Contact {
   department: 'Founder / Leadership' | 'Engineering' | 'Talent / HR' | 'Product'
   location?: string
   verifiedAt?: string
+  companyWebsite?: string
+  twitterUrl?: string
+  githubUrl?: string
+  careersUrl?: string
+  mxValid?: boolean
+  provider?: string
+  relatedAccounts?: Array<{ platform: string; url: string; type?: string }>
   isMockData?: boolean
 }
 

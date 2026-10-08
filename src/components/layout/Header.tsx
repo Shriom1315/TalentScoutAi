@@ -204,16 +204,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           <span>Reset Pipeline</span>
         </button>
 
-        {/* Discovery trigger badge */}
-        <button
-          onClick={() => runDiscovery()}
-          disabled={isDiscovering}
-          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100/70 text-blue-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5 animate-pulse text-blue-600" />
-          <span>{isDiscovering ? 'Scanning...' : 'Run Live Scrape'}</span>
-        </button>
-
         {/* Notifications Dropdown */}
         <div ref={notifRef} className="relative">
           <button

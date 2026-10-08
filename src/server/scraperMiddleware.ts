@@ -22,6 +22,18 @@ export function runPythonScraper(args: string[]): Promise<any> {
           const parsed = JSON.parse(stdout)
           resolve(parsed)
         } catch (e) {
+          const firstBrace = stdout.indexOf('{')
+          const lastBrace = stdout.lastIndexOf('}')
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            try {
+              const cleanJson = stdout.slice(firstBrace, lastBrace + 1)
+              const parsed = JSON.parse(cleanJson)
+              resolve(parsed)
+              return
+            } catch (innerErr) {
+              // fallback
+            }
+          }
           reject(new Error(`Failed to parse Python JSON: ${stdout.slice(0, 150)}`))
         }
       }
@@ -67,6 +79,66 @@ const CANDIDATE_SKILLS = [
   'mongodb',
 ]
 
+function extractExperienceRequirementsNode(
+  title: string,
+  desc: string,
+  _tags: string[] = []
+): { label: string; minExp: number; maxExp: number } {
+  const tLower = title.toLowerCase()
+  const dLower = desc.toLowerCase()
+
+  // 1. Internship check (STRICTLY in title or unambiguous internship phrase)
+  if (/\b(intern|internship|trainee|apprentice)\b/i.test(tLower)) {
+    return { label: 'Internship', minExp: 0, maxExp: 0 }
+  }
+
+  // 2. Explicit senior / lead / executive title
+  if (/\b(senior|sr\.|lead|principal|staff|architect|director|head of|vp|manager)\b/i.test(tLower)) {
+    const rangeMatch = dLower.match(/(\d+)\s*[-–to]+\s*(\d+)\s*(?:\+)?\s*(?:years?|yrs?)/i)
+    if (rangeMatch) {
+      const minE = parseInt(rangeMatch[1], 10)
+      const maxE = parseInt(rangeMatch[2], 10)
+      return { label: `${minE}–${maxE} years (Senior / Lead)`, minExp: minE, maxExp: maxE }
+    }
+    const minPlusMatch = dLower.match(/(\d+)\s*\+\s*(?:years?|yrs?)/i)
+    if (minPlusMatch) {
+      const minE = parseInt(minPlusMatch[1], 10)
+      return { label: `${minE}+ years (Senior / Lead)`, minExp: minE, maxExp: minE + 4 }
+    }
+    return { label: '4–7+ years (Senior / Lead)', minExp: 4, maxExp: 7 }
+  }
+
+  // 3. Explicit numeric range search in description
+  const rangeMatch = dLower.match(/(\d+)\s*[-–to]+\s*(\d+)\s*(?:\+)?\s*(?:years?|yrs?)/i)
+  if (rangeMatch) {
+    const minE = parseInt(rangeMatch[1], 10)
+    const maxE = parseInt(rangeMatch[2], 10)
+    if (minE === 0 && maxE <= 1) return { label: '0–1 years (Fresher)', minExp: 0, maxExp: 1 }
+    if (minE === 0 && maxE <= 2) return { label: '0–2 years (Entry Level)', minExp: 0, maxExp: 2 }
+    if (minE >= 1 && maxE <= 3) return { label: '1–3 years (Early Career)', minExp: 1, maxExp: 3 }
+    if (minE >= 2 && maxE <= 5) return { label: `${minE}–${maxE} years`, minExp: minE, maxExp: maxE }
+    if (minE >= 4) return { label: `${minE}–${maxE} years (Mid / Senior)`, minExp: minE, maxExp: maxE }
+    return { label: `${minE}–${maxE} years`, minExp: minE, maxExp: maxE }
+  }
+
+  // 4. "X+ years" pattern
+  const minPlusMatch = dLower.match(/(\d+)\s*\+\s*(?:years?|yrs?)/i)
+  if (minPlusMatch) {
+    const minE = parseInt(minPlusMatch[1], 10)
+    if (minE >= 4) return { label: `${minE}+ years (Senior)`, minExp: minE, maxExp: minE + 3 }
+    if (minE >= 2) return { label: `${minE}+ years`, minExp: minE, maxExp: minE + 2 }
+    if (minE <= 1) return { label: `${minE}+ years (Entry Level)`, minExp: minE, maxExp: 2 }
+  }
+
+  // 5. Fresher / Graduate / Junior keywords
+  if (/\b(fresher|entry[- ]level|junior|graduate|early career)\b/i.test(tLower) || /\b(fresher|freshers|2024 batch|2025 batch)\b/i.test(dLower)) {
+    return { label: '0–1 years (Fresher)', minExp: 0, maxExp: 1 }
+  }
+
+  // 6. Default early-career tech developer
+  return { label: '0–2 years (Entry Level)', minExp: 0, maxExp: 2 }
+}
+
 function calculateMatchScore(title: string, desc: string, tags: string[] = []): {
   matchScore: number
   matchBreakdown: {
@@ -76,7 +148,9 @@ function calculateMatchScore(title: string, desc: string, tags: string[] = []): 
     location: number
     roleAlignment: number
   }
-  experience: 'Internship' | 'Fresher' | '0–1 years' | '0–2 years' | '1–2 years' | '2–3 years'
+  experience: string
+  minExpYears: number
+  maxExpYears: number
   detectedTech: string[]
 } {
   const combinedText = `${title} ${desc} ${tags.join(' ')}`.toLowerCase()
@@ -115,7 +189,7 @@ function calculateMatchScore(title: string, desc: string, tags: string[] = []): 
   }
 
   // Skills match score (max 35)
-  let techPoints = 12
+  let techPoints = 14
   for (const skill of CANDIDATE_SKILLS) {
     if (combinedText.includes(skill)) techPoints += 3
   }
@@ -134,25 +208,22 @@ function calculateMatchScore(title: string, desc: string, tags: string[] = []): 
   }
   const roleAlignment = Math.min(25, rolePoints)
 
-  // Experience level (max 20)
+  // Experience level & numeric bracket extraction
+  const expInfo = extractExperienceRequirementsNode(title, desc, tags)
   let expScore = 18
-  let expType: 'Internship' | 'Fresher' | '0–1 years' | '0–2 years' | '1–2 years' | '2–3 years' =
-    '0–2 years'
-
-  if (/intern|internship|trainee/i.test(title) || /intern|internship/i.test(desc)) {
-    expType = 'Internship'
+  if (expInfo.label === 'Internship') {
     expScore = 20
-  } else if (/fresher|entry|junior|graduate|0-1|0–1|early career/i.test(combinedText)) {
-    expType = 'Fresher'
+  } else if (expInfo.minExp <= 1) {
     expScore = 20
-  } else if (/1-2|1–2|2 years/i.test(combinedText)) {
-    expType = '1–2 years'
-    expScore = 17
-  } else if (/senior|lead|principal|staff|director|head of/i.test(title)) {
-    expType = '2–3 years'
+  } else if (expInfo.minExp <= 2) {
+    expScore = 18
+  } else if (expInfo.minExp === 3) {
     expScore = 12
+  } else {
+    // 4+ years senior roles
+    expScore = 6
   }
-  const experience = Math.min(20, expScore)
+  const experience = expScore
 
   // Education fit (max 10) - MCA / CS candidate
   const education = 10
@@ -166,7 +237,7 @@ function calculateMatchScore(title: string, desc: string, tags: string[] = []): 
   const matchScore = technicalSkills + roleAlignment + experience + education + locationScore
 
   return {
-    matchScore: Math.min(98, Math.max(72, matchScore)),
+    matchScore: Math.min(98, Math.max(55, matchScore)),
     matchBreakdown: {
       technicalSkills,
       experience,
@@ -174,7 +245,9 @@ function calculateMatchScore(title: string, desc: string, tags: string[] = []): 
       location: locationScore,
       roleAlignment,
     },
-    experience: expType,
+    experience: expInfo.label,
+    minExpYears: expInfo.minExp,
+    maxExpYears: expInfo.maxExp,
     detectedTech,
   }
 }
@@ -211,81 +284,6 @@ function generateDynamicPrototypeIdea(
       `Clean, documented repository with deployment preview URL`,
     ],
   }
-}
-
-function estimateLpaSalaryNode(
-  title: string,
-  company: string,
-  expType: string,
-  tech: string[]
-): {
-  display: string
-  min: number
-  max: number
-} {
-  const isTopTier = /cred|groww|meesho|zeta|mindtickle|inmobi|druva|pubmatic|pocket fm/i.test(company)
-  const isAi = /ai|machine learning|ml|data science/i.test(`${title} ${tech.join(' ')}`)
-
-  let min = 10.0
-  let max = 16.0
-  if (expType === 'Internship') {
-    min = isTopTier ? 4.8 : 3.6
-    max = isTopTier ? 7.5 : 5.5
-  } else if (expType === 'Fresher') {
-    min = isTopTier ? 14.0 : 8.5
-    max = isTopTier ? 22.0 : 14.0
-  } else if (expType === '0–2 years' || expType === '0–1 years') {
-    min = isTopTier ? 16.0 : 10.0
-    max = isTopTier ? 24.0 : 16.0
-  } else if (expType === '1–2 years') {
-    min = isTopTier ? 18.0 : 12.0
-    max = isTopTier ? 28.0 : 19.0
-  } else {
-    min = isTopTier ? 22.0 : 15.0
-    max = isTopTier ? 34.0 : 24.0
-  }
-
-  if (isAi) {
-    min += 2.0
-    max += 3.0
-  }
-
-  const roundedMin = Math.round(min * 10) / 10
-  const roundedMax = Math.round(max * 10) / 10
-
-  return {
-    display: `₹${roundedMin.toFixed(1)} LPA – ₹${roundedMax.toFixed(1)} LPA`,
-    min: roundedMin,
-    max: roundedMax,
-  }
-}
-
-function formatRecentDateNode(offsetIndex: number): {
-  postedDate: string
-  postedRelative: string
-  timestamp: number
-} {
-  const offsetHours = offsetIndex < 10 ? offsetIndex * 1.5 : 12 + (offsetIndex - 10) * 3
-  const ts = Date.now() - Math.round(offsetHours * 3600 * 1000 + (offsetIndex % 60) * 60 * 1000)
-  const dt = new Date(ts)
-  const timeStr = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  const diffHours = Math.floor((Date.now() - ts) / (3600 * 1000))
-
-  let relative = `${diffHours} hours ago`
-  let postedDate = `Today at ${timeStr}`
-  if (diffHours < 1) {
-    relative = 'Just now'
-    postedDate = `Today at ${timeStr}`
-  } else if (diffHours >= 24 && diffHours < 48) {
-    relative = 'Yesterday'
-    postedDate = `Yesterday at ${timeStr}`
-  } else if (diffHours >= 48) {
-    const days = Math.floor(diffHours / 24)
-    relative = `${days} days ago`
-    postedDate = `${dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} at ${timeStr}`
-  }
-
-  return { postedDate, postedRelative: relative, timestamp: ts }
 }
 
 // Scrape live Hacker News Who is Hiring
@@ -611,6 +609,72 @@ export async function verifyEmailDns(email: string): Promise<{
   }
 }
 
+function computeLpaSalaryNode(
+  company: string,
+  role: string,
+  expType: string
+): { range: string; min: number; max: number; mid: number } {
+  const famousUnicorns = ['cred', 'meesho', 'inmobi', 'zeta', 'mindtickle', 'druva', 'pubmatic', 'porter']
+  const isTier1 = famousUnicorns.some((c) => company.toLowerCase().includes(c))
+  let min = 10
+  let max = 16
+  if (expType === 'Internship' || /intern/i.test(role)) {
+    min = isTier1 ? 4.8 : 3.6
+    max = isTier1 ? 7.2 : 6.0
+  } else if (expType === 'Fresher' || /junior|trainee/i.test(role)) {
+    min = isTier1 ? 12.0 : 7.5
+    max = isTier1 ? 18.0 : 13.5
+  } else if (expType === '0–1 years') {
+    min = isTier1 ? 13.0 : 8.5
+    max = isTier1 ? 19.0 : 14.5
+  } else if (expType === '0–2 years') {
+    min = isTier1 ? 14.0 : 10.0
+    max = isTier1 ? 22.0 : 16.5
+  } else if (expType === '1–2 years') {
+    min = isTier1 ? 16.0 : 12.0
+    max = isTier1 ? 25.0 : 18.5
+  } else {
+    min = isTier1 ? 18.0 : 14.0
+    max = isTier1 ? 28.0 : 22.0
+  }
+  if (/ai|machine learning|full stack|react|cloud/i.test(role)) {
+    min += 1.0
+    max += 2.0
+  }
+  const mid = Math.round(((min + max) / 2) * 10) / 10
+  return {
+    range: `₹${min} – ${max} LPA`,
+    min,
+    max,
+    mid,
+  }
+}
+
+function computeEligibilityNode(role: string, expType: string, minExp: number = 0, maxExp: number = 2) {
+  const isSenior = /senior|lead|principal|staff|architect|director|manager/i.test(role) || minExp >= 3
+  const isEligible = !isSenior && minExp <= 2
+  return {
+    degrees: ['MCA', 'B.Tech', 'BE', 'BCA', 'CS / IT Graduate'],
+    experienceYears: expType,
+    batch: ['2024', '2025', '2026'],
+    isEligible,
+    degreeEligible: true,
+    experienceEligible: isEligible,
+    batchEligible: isEligible,
+    minExp,
+    maxExp,
+    reason: isSenior
+      ? `Requires ${minExp}+ years experience (mid-to-senior role).`
+      : `Directly eligible for MCA/B.Tech graduates with ${expType} background.`,
+    eligibilitySummary: isSenior
+      ? `Requires ${minExp}+ Years Experience (Mid / Senior Role)`
+      : `Eligible: MCA / B.Tech • ${expType}`,
+    matchReason: isSenior
+      ? 'Senior experience required'
+      : `Profile matches early-career ${expType} background`,
+  }
+}
+
 // Scrape live Indian IT Hubs from public ATS endpoints (Meesho, InMobi, PubMatic, Druva, Zeta, CRED)
 async function scrapeIndianITHubsNode(): Promise<ScrapedRawJob[]> {
   const jobs: ScrapedRawJob[] = []
@@ -806,8 +870,20 @@ export async function runRealTimeScrapingPipeline(query?: string) {
 
     const website = (raw as any).companyWebsite || raw.url || `https://www.google.com/search?q=${encodeURIComponent(raw.company + ' careers')}`
 
-    const salaryLpa = estimateLpaSalaryNode(raw.title, raw.company, scoreData.experience, scoreData.detectedTech)
-    const recentDate = formatRecentDateNode(oppCounter)
+    const lpaInfo = computeLpaSalaryNode(raw.company, raw.title, scoreData.experience)
+    const eligibilityInfo = computeEligibilityNode(
+      raw.title,
+      scoreData.experience,
+      scoreData.minExpYears,
+      scoreData.maxExpYears
+    )
+    const postTime = new Date(Date.now() - (oppCounter * 120000))
+    const postedDate = `Today at ${postTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    const postedTimeFormatted = `${postTime.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} • ${postTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+
+    const famousUnicorns = ['meesho', 'cred', 'inmobi', 'mindtickle', 'pubmatic', 'druva', 'zeta', 'pocket fm', 'porter', 'groww']
+    const isFamous = famousUnicorns.some((c) => raw.company.toLowerCase().includes(c))
+    const companyTier = isFamous ? 'Unicorn' : 'Tier-1 Tech'
 
     // Build Opportunity
     const opp = {
@@ -821,29 +897,27 @@ export async function runRealTimeScrapingPipeline(query?: string) {
       location: raw.location || (raw.remote ? 'Remote' : 'Hybrid'),
       remote: Boolean(raw.remote),
       experience: scoreData.experience,
+      minExpYears: scoreData.minExpYears,
+      maxExpYears: scoreData.maxExpYears,
       employmentType: 'Full-time',
       technologies: scoreData.detectedTech,
       education: ['MCA', 'BCA', 'B.Tech', 'CS Graduate'],
-      postedDate: recentDate.postedDate,
-      postedRelative: recentDate.postedRelative,
-      postedTimestamp: recentDate.timestamp,
+      postedDate,
+      postedTimestamp: postTime.getTime(),
+      postedTimeFormatted,
       source: raw.source,
       sourceUrl: raw.url,
       matchScore: scoreData.matchScore,
       matchBreakdown: scoreData.matchBreakdown,
       contactId: contactId,
       status: 'active',
-      salaryRange: salaryLpa.display,
-      salaryLpaMin: salaryLpa.min,
-      salaryLpaMax: salaryLpa.max,
-      eligibility: {
-        eligibleDegrees: ['MCA', 'BCA', 'B.Tech', 'BE', 'CS / IT Graduate'],
-        experienceRange: scoreData.experience === 'Internship' ? 'Pursuing or Recent Graduate' : 'Freshers / 0–2 years',
-        eligibleBatches: ['2024 Batch', '2025 Batch', '2026 Batch'],
-        minMatchPercent: 75,
-        isEligible: true,
-        summary: `Eligible: MCA / Freshers & ${scoreData.experience}`,
-      },
+      salaryRange: lpaInfo.range,
+      salaryLpa: lpaInfo.mid,
+      salaryMinLpa: lpaInfo.min,
+      salaryMaxLpa: lpaInfo.max,
+      eligibility: eligibilityInfo,
+      isFamousCompany: isFamous,
+      companyTier,
       requirements: [
         `Strong proficiency in ${scoreData.detectedTech.slice(0, 2).join(' & ')}`,
         'Demonstrated ability to write clean, maintainable, and typed code',
@@ -940,27 +1014,34 @@ export function createLiveScraperMiddleware(): Connect.NextHandleFunction {
 
     if (pathname === '/api/scrape/jobs') {
       const query = (parsedUrl.query.query as string) || ''
+      const location = (parsedUrl.query.location as string) || ''
+      const sites = (parsedUrl.query.sites as string) || 'naukri,indeed,linkedin,glassdoor'
+      const maxJobs = (parsedUrl.query.maxJobs as string) || '30'
+      const hoursOld = (parsedUrl.query.hoursOld as string) || '168'
+
       try {
-        console.log(`[TalentScout Engine] Executing Python multi-library scraper (query="${query}")...`)
-        const pythonData = await runPythonScraper(['--query', query, '--max-jobs', '30'])
+        console.log(`[TalentScout Engine] Executing JobSpy Python Engine (query="${query}", location="${location}", sites="${sites}")...`)
+        const args = ['--query', query, '--location', location, '--sites', sites, '--max-jobs', maxJobs, '--hours-old', hoursOld]
+        const pythonData = await runPythonScraper(args)
         res.setHeader('Content-Type', 'application/json')
         res.writeHead(200)
         res.end(JSON.stringify(pythonData))
         return
-      } catch (pythonErr) {
-        console.warn('[TalentScout Engine] Python execution issue, utilizing high-speed in-process fallback:', pythonErr)
+      } catch (pythonErr: any) {
+        console.warn('[TalentScout Engine] Python execution issue, retrying JobSpy with standard arguments:', pythonErr?.message)
         try {
-          const fallbackData = await runRealTimeScrapingPipeline(query)
+          const pythonData = await runPythonScraper(['--max-jobs', '25'])
           res.setHeader('Content-Type', 'application/json')
           res.writeHead(200)
-          res.end(JSON.stringify(fallbackData))
+          res.end(JSON.stringify(pythonData))
+          return
         } catch (err: unknown) {
           const error = err as Error
           res.setHeader('Content-Type', 'application/json')
           res.writeHead(500)
-          res.end(JSON.stringify({ error: error.message || 'Scraper failed' }))
+          res.end(JSON.stringify({ error: error.message || 'JobSpy Scraper execution failed' }))
+          return
         }
-        return
       }
     }
 
@@ -987,6 +1068,36 @@ export function createLiveScraperMiddleware(): Connect.NextHandleFunction {
             res.writeHead(200)
             res.end(JSON.stringify(result))
           }
+        } catch (err: unknown) {
+          const error = err as Error
+          res.setHeader('Content-Type', 'application/json')
+          res.writeHead(400)
+          res.end(JSON.stringify({ error: error.message }))
+        }
+      })
+      return
+    }
+
+    if (pathname === '/api/enrich/contact' && req.method === 'POST') {
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk
+      })
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}')
+          const company = (parsed.company || '').trim()
+          const website = (parsed.website || '').trim()
+          const role = (parsed.role || 'Software Engineer').trim()
+
+          const args = ['--enrich-company', company]
+          if (website) args.push('--website', website)
+          if (role) args.push('--role', role)
+
+          const enriched = await runPythonScraper(args)
+          res.setHeader('Content-Type', 'application/json')
+          res.writeHead(200)
+          res.end(JSON.stringify(enriched))
         } catch (err: unknown) {
           const error = err as Error
           res.setHeader('Content-Type', 'application/json')

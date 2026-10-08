@@ -33,6 +33,7 @@ INDIAN_TECH_BOARDS = [
     ("lever", "CRED", "cred", "https://cred.club", "https://cred.club/favicon.ico"),
     ("lever", "Pocket FM", "pocketfm", "https://pocketfm.com", "https://pocketfm.com/favicon.ico"),
     ("gh", "Groww", "groww", "https://groww.in", "https://groww.in/favicon.ico"),
+    ("lever", "Porter", "porter", "https://porter.in", "https://porter.in/favicon.ico"),
 ]
 
 CITY_HUB_MAP = [
@@ -111,7 +112,6 @@ def fetch_lever_jobs(company: str, slug: str, website: str, logo: str) -> List[D
 
             clean_desc = re.sub(r"\s+", " ", plain_desc)[:750]
             job_url = item.get("hostedUrl") or f"{website}/careers"
-            created_at_ms = item.get("createdAt")
 
             # Check if an authentic email is in description
             found_emails = EMAIL_REGEX.findall(clean_desc)
@@ -121,6 +121,9 @@ def fetch_lever_jobs(company: str, slug: str, website: str, logo: str) -> List[D
             tags = [t.capitalize() for t in TECH_KEYWORDS if t in f"{title} {clean_desc}".lower()][:6]
             if "React" not in tags and any(r in f"{title} {clean_desc}".lower() for r in ["ui", "frontend", "web"]):
                 tags.append("React")
+
+            created_at_val = item.get("createdAt")
+            is_unicorn = company.lower() in ["cred", "meesho", "inmobi", "zeta", "mindtickle", "druva", "porter"]
 
             results.append({
                 "title": title,
@@ -136,7 +139,9 @@ def fetch_lever_jobs(company: str, slug: str, website: str, logo: str) -> List[D
                 "contactName": f"{company} Technical Hiring Team",
                 "contactRole": "Recruiter / Hiring Lead",
                 "logo": logo,
-                "createdAt": created_at_ms,
+                "createdAtMs": created_at_val,
+                "isFamousCompany": True,
+                "companyTier": "Unicorn" if is_unicorn else "Tier-1 Tech",
             })
     except Exception as e:
         print(f"[Lever Extractor Error: {company}] {e}")
@@ -178,15 +183,6 @@ def fetch_greenhouse_jobs(company: str, slug: str, website: str, logo: str) -> L
                     continue
 
                 job_url = item.get("absolute_url") or f"{website}/careers"
-                updated_str = item.get("updated_at") or item.get("first_published")
-                created_at_ms = None
-                if updated_str:
-                    try:
-                        from datetime import datetime
-                        dt = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
-                        created_at_ms = int(dt.timestamp() * 1000)
-                    except Exception:
-                        pass
 
                 found_emails = EMAIL_REGEX.findall(clean_desc)
                 email = found_emails[0] if found_emails else ""
@@ -194,6 +190,9 @@ def fetch_greenhouse_jobs(company: str, slug: str, website: str, logo: str) -> L
                 tags = [t.capitalize() for t in TECH_KEYWORDS if t in f"{title} {clean_desc}".lower()][:6]
                 if "React" not in tags and any(r in f"{title} {clean_desc}".lower() for r in ["ui", "frontend", "web"]):
                     tags.append("React")
+
+                updated_at_val = item.get("updated_at") or item.get("first_published")
+                is_unicorn = company.lower() in ["cred", "meesho", "inmobi", "zeta", "mindtickle", "druva", "porter"]
 
                 results.append({
                     "title": title,
@@ -209,7 +208,9 @@ def fetch_greenhouse_jobs(company: str, slug: str, website: str, logo: str) -> L
                     "contactName": f"{company} Talent Acquisition",
                     "contactRole": "Technical Hiring Manager",
                     "logo": logo,
-                    "createdAt": created_at_ms,
+                    "updatedAtIso": updated_at_val,
+                    "isFamousCompany": True,
+                    "companyTier": "Unicorn" if is_unicorn else "Tier-1 Tech",
                 })
             # If successful with first base, break
             if results:

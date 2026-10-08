@@ -12,10 +12,12 @@ import {
   CheckCircle2,
   Users2,
   TrendingUp,
+  IndianRupee,
   Clock,
+  Award,
   GraduationCap,
-  Banknote,
-  Check,
+  Briefcase,
+  AlertCircle,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { MatchScoreBadge, EmailStatusBadge, Badge } from '../components/common/Badge'
@@ -76,9 +78,20 @@ export const OpportunityDetails: React.FC = () => {
         </button>
 
         <div className="flex items-center gap-2">
+          <a
+            href={opp.directUrl || opp.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            title="Open direct job application link on ATS / Job board"
+          >
+            <span>Apply Directly</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+
           <button
             onClick={() => toggleSaveJob(opp.id)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
               isSaved
                 ? 'border-amber-300 bg-amber-50 text-amber-800'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -100,7 +113,7 @@ export const OpportunityDetails: React.FC = () => {
           {contact && (
             <button
               onClick={() => openOutreachModal(contact, opp)}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Generate Outreach</span>
@@ -121,6 +134,16 @@ export const OpportunityDetails: React.FC = () => {
                 <span className="text-lg sm:text-xl font-extrabold text-slate-900">
                   {opp.company}
                 </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                  <Sparkles className="w-3 h-3 text-blue-600" />
+                  <span>{opp.source || 'JobSpy Engine'}</span>
+                </span>
+                {opp.isFamousCompany && (
+                  <span className="inline-flex items-center gap-1 text-xs font-extrabold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200">
+                    <Award className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{opp.companyTier || 'Top Indian Unicorn'}</span>
+                  </span>
+                )}
                 {comp?.stage && (
                   <Badge variant="primary" size="sm">
                     {comp.stage} Stage
@@ -145,28 +168,23 @@ export const OpportunityDetails: React.FC = () => {
                 <span>•</span>
                 <span>{opp.employmentType}</span>
                 <span>•</span>
-                <span className="font-mono text-[11px] flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/80">
-                  <Clock className="w-3 h-3 text-blue-600" />
-                  <span>Posted {opp.postedDate}</span>
-                  {opp.postedRelative && (
-                    <span className="text-[10px] text-blue-500 font-normal">({opp.postedRelative})</span>
-                  )}
+                <span className="flex items-center gap-1 text-slate-600 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Posted {opp.postedTimeFormatted || opp.postedDate}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="sm:text-right shrink-0 bg-emerald-50/60 sm:bg-transparent p-3 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-emerald-100">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 sm:text-slate-500 mb-1 flex items-center sm:justify-end gap-1">
-              <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Salary Criteria (LPA)</span>
+          <div className="sm:text-right shrink-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Estimated Salary (LPA)
             </div>
-            <div className="text-base sm:text-lg font-black text-emerald-700 tracking-tight">
-              {opp.salaryRange}
+            <div className="text-sm sm:text-base font-extrabold text-emerald-700 flex items-center sm:justify-end gap-1">
+              <IndianRupee className="w-4 h-4 text-emerald-600" />
+              <span>{opp.salaryRange || (opp.salaryLpa ? `₹${opp.salaryLpa} LPA` : 'Competitive LPA')}</span>
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">
-              Benchmarked for Indian Tech Hubs • Freshers / 0–2 Yrs
-            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Indian Tech Market LPA Benchmark</div>
           </div>
         </div>
 
@@ -253,70 +271,6 @@ export const OpportunityDetails: React.FC = () => {
             </div>
           </div>
 
-          {/* Dedicated Eligibility Criteria & Candidate Fit Card */}
-          <div className="bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/30 rounded-2xl border border-emerald-200/80 shadow-2xs p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                  <GraduationCap className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">Eligibility Criteria</h2>
-                  <p className="text-[11px] text-slate-500">Degree, Experience, & Graduating Batch Requirements</p>
-                </div>
-              </div>
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                  opp.eligibility?.isEligible !== false
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                    : 'bg-amber-100 text-amber-800 border-amber-200'
-                }`}
-              >
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                <span>{opp.eligibility?.isEligible !== false ? 'Candidate Eligible (MCA/Fresher)' : 'Review Criteria'}</span>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Eligible Degrees</span>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {(opp.eligibility?.eligibleDegrees || opp.education || ['MCA', 'B.Tech (CS)', 'BE', 'BCA']).map((deg) => (
-                    <span key={deg} className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
-                      {deg}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Experience Window</span>
-                <span className="text-xs font-bold text-slate-900 mt-1.5 block">
-                  {opp.eligibility?.experienceRange || opp.experience || 'Freshers / 0 - 2 Years'}
-                </span>
-                <span className="text-[10px] text-slate-500 mt-0.5 block">Entry Level / Early Career</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Eligible Batches</span>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {(opp.eligibility?.eligibleBatches || ['2024', '2025', '2026']).map((batch) => (
-                    <span key={batch} className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {batch} Batch
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {opp.eligibility?.summary && (
-              <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-xs text-emerald-900 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{opp.eligibility.summary}</span>
-              </div>
-            )}
-          </div>
-
           {/* Core Requirements */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-6 space-y-4">
             <h2 className="text-base font-bold text-slate-900">Key Requirements</h2>
@@ -364,9 +318,88 @@ export const OpportunityDetails: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (5 cols): Match Analysis, Contact Intelligence & Proof-of-Skill */}
+        {/* Right Column (5 cols): Eligibility Assessment, Match Analysis, Contact Intelligence & Proof-of-Skill */}
         <div className="lg:col-span-5 space-y-6">
-          {/* 1. MATCH ANALYSIS CARD */}
+          {/* 1. EARLY-CAREER ELIGIBILITY ASSESSMENT CARD */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Candidate Evaluation
+                </span>
+                <h2 className="text-base font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                  <GraduationCap className="w-4 h-4 text-indigo-600" />
+                  <span>MCA & Fresher Eligibility</span>
+                </h2>
+              </div>
+              {opp.eligibility?.isEligible ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Eligible</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Review Required</span>
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 text-xs">
+              {/* Degree Fit */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Degree / Stream Fit</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {opp.eligibility?.degreeEligible ? 'MCA / B.Tech / BCA Accepted' : 'Engineering Degree Required'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                  Qualified
+                </span>
+              </div>
+
+              {/* Experience Fit */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Experience Window</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    Role requires {opp.eligibility?.minExp ?? 0}–{opp.eligibility?.maxExp ?? 3} Years
+                  </span>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    opp.eligibility?.experienceEligible
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {opp.eligibility?.experienceEligible ? '0–2 Yrs Fit' : 'Higher Exp'}
+                </span>
+              </div>
+
+              {/* Graduation Batch Fit */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Graduation Batch Fit</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {opp.eligibility?.batchEligible ? '2024, 2025 & 2026 Batches' : 'Immediate Joiners'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                  2024–2026
+                </span>
+              </div>
+            </div>
+
+            {/* Assessment Note */}
+            <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/60 text-xs text-slate-600 leading-relaxed">
+              <span className="font-semibold text-slate-800">Scout Assessment: </span>
+              {opp.eligibility?.reason || 'Candidate has strong alignment with early career skills.'}
+            </div>
+          </div>
+
+          {/* 2. MATCH ANALYSIS CARD */}
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-6 space-y-5">
             <div className="flex items-center justify-between">
               <div>

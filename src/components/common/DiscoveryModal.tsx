@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Sparkles,
   CheckCircle2,
@@ -9,19 +10,15 @@ import {
   ArrowRight,
   ShieldCheck,
   Zap,
+  X,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 
-const DISCOVERY_STEPS = [
-  'Connecting to Indian IT hubs & tech pipelines (Bengaluru, Hyderabad, Pune, NCR, Mumbai)',
-  'Scraping live engineering and product vacancies across Indian tech companies & startups',
-  'Filtering early-career, MCA, and React/Node/Full Stack roles',
-  'Extracting hiring manager & recruiter decision makers',
-  'Executing RFC-5321 DNS MX mailbox verification via dnspython',
-  'Calculating dynamic match scores against candidate credentials',
-]
+import { DISCOVERY_STEPS } from '../../constants/discovery'
+export { DISCOVERY_STEPS }
 
 export const DiscoveryModal: React.FC = () => {
+  const navigate = useNavigate()
   const {
     isDiscoveryModalOpen,
     isDiscovering,
@@ -36,11 +33,26 @@ export const DiscoveryModal: React.FC = () => {
 
   if (!isDiscoveryModalOpen) return null
 
-  const isComplete = !isDiscovering && discoveryStepsCompleted.length >= DISCOVERY_STEPS.length
+  const isComplete = !isDiscovering && (discoveryStepsCompleted.length >= DISCOVERY_STEPS.length || opportunities.length > 0)
   const strongMatchesCount = opportunities.filter((o) => o.matchScore >= 80).length
+  const progressPercentage = isComplete
+    ? 100
+    : Math.min(100, Math.round((discoveryStepsCompleted.length / DISCOVERY_STEPS.length) * 100))
+
+  const handleViewDiscoveredRoles = () => {
+    closeDiscoveryModal()
+    navigate('/opportunities')
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isDiscovering) {
+          closeDiscoveryModal()
+        }
+      }}
+    >
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden transition-all">
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
@@ -49,22 +61,36 @@ export const DiscoveryModal: React.FC = () => {
               <Sparkles className={`w-5 h-5 ${isDiscovering ? 'animate-pulse' : ''}`} />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900 text-base">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-slate-900 text-base">
+                  {isDiscovering
+                    ? 'JobSpy Live Scraper Running'
+                    : isComplete
+                    ? 'JobSpy Discovery Completed'
+                    : 'JobSpy Real-Time Job Discovery'}
+                </h3>
+                <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  JobSpy Engine
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isDiscovering
-                  ? 'Real-Time Scraper Running'
+                  ? (discoveryStatusText || 'Harvesting live tech postings from Indeed India, LinkedIn & Indian IT hubs')
                   : isComplete
-                  ? 'Live Scraping Completed'
-                  : 'Run Real-Time Live Scraper'}
-              </h3>
-              <p className="text-xs text-slate-500">
-                {isDiscovering
-                  ? (discoveryStatusText || 'Harvesting live tech postings from Indian IT hubs & verifying records')
-                  : isComplete
-                  ? 'Pipeline synchronized with fresh live developer postings from Indian IT hubs'
-                  : 'Live scrape from Indian IT Hubs (Bengaluru, Hyderabad, Pune, Mumbai, NCR) & tech feeds'}
+                  ? 'Pipeline synchronized with fresh live developer postings from Indian IT hubs & JobSpy'
+                  : 'Live multi-board scrape from LinkedIn, Indeed India & Indian IT Hubs (Bengaluru, Pune, Hyderabad)'}
               </p>
             </div>
           </div>
+          {!isDiscovering && (
+            <button
+              onClick={closeDiscoveryModal}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Close discovery modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Body */}
@@ -73,15 +99,13 @@ export const DiscoveryModal: React.FC = () => {
           <div className="mb-6">
             <div className="flex justify-between text-xs font-medium text-slate-600 mb-2">
               <span>Execution Progress</span>
-              <span>
-                {Math.min(100, Math.round((discoveryStepsCompleted.length / DISCOVERY_STEPS.length) * 100))}%
-              </span>
+              <span>{progressPercentage}%</span>
             </div>
             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-blue-600 rounded-full transition-all duration-300 ease-out"
                 style={{
-                  width: `${Math.min(100, (discoveryStepsCompleted.length / DISCOVERY_STEPS.length) * 100)}%`,
+                  width: `${progressPercentage}%`,
                 }}
               />
             </div>
@@ -90,7 +114,7 @@ export const DiscoveryModal: React.FC = () => {
           {/* Stepper items */}
           <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
             {DISCOVERY_STEPS.map((stepText, idx) => {
-              const isDone = discoveryStepsCompleted.includes(stepText)
+              const isDone = isComplete || discoveryStepsCompleted.includes(stepText)
               const isCurrent = isDiscovering && discoveryStep === idx + 1
 
               return (
@@ -166,7 +190,7 @@ export const DiscoveryModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => runDiscovery()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Start Live Scrape Now</span>
               </button>
@@ -174,8 +198,8 @@ export const DiscoveryModal: React.FC = () => {
             {isComplete && (
               <button
                 type="button"
-                onClick={closeDiscoveryModal}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+                onClick={handleViewDiscoveredRoles}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer hover:shadow"
               >
                 <span>View Discovered Roles</span>
                 <ArrowRight className="w-3.5 h-3.5" />

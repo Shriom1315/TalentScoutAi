@@ -18,9 +18,18 @@ import {
   LayoutGrid,
   List,
   Check,
+  CheckCircle2,
+  IndianRupee,
+  Calendar,
+  Award,
+  Globe2,
+  Radio,
+  Flame,
+  Briefcase,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { MatchScoreBadge, Badge } from '../components/common/Badge'
+import { Opportunity } from '../types'
 
 export const Opportunities: React.FC = () => {
   const navigate = useNavigate()
@@ -30,23 +39,28 @@ export const Opportunities: React.FC = () => {
     savedJobIds,
     toggleSaveJob,
     openContactDrawer,
+    openOutreachModal,
     openDiscoveryModal,
+    runDiscovery,
+    isDiscovering,
   } = useApp()
 
   // Filter States
   const [search, setSearch] = useState('')
   const [selectedHub, setSelectedHub] = useState<string>('All')
+  const [selectedBoard, setSelectedBoard] = useState<string>('All')
   const [selectedCompany, setSelectedCompany] = useState<string>('All')
-  const [minSalaryLpa, setMinSalaryLpa] = useState<number>(0)
+  const [selectedLpaTier, setSelectedLpaTier] = useState<string>('All')
+  const [selectedExpBracket, setSelectedExpBracket] = useState<string>('All')
+  const [selectedFreshness, setSelectedFreshness] = useState<string>('All')
   const [eligibleOnly, setEligibleOnly] = useState<boolean>(false)
-  const [recencyFilter, setRecencyFilter] = useState<'all' | '24h' | '3d' | '7d'>('all')
-  const [selectedExperience, setSelectedExperience] = useState<string[]>([])
+  const [famousOnly, setFamousOnly] = useState<boolean>(false)
   const [selectedTech, setSelectedTech] = useState<string[]>([])
   const [selectedEducation, setSelectedEducation] = useState<string[]>([])
   const [selectedStage, setSelectedStage] = useState<string[]>([])
   const [remoteOnly, setRemoteOnly] = useState(false)
   const [minMatch, setMinMatch] = useState<number>(0)
-  const [sortBy, setSortBy] = useState<'date' | 'match' | 'salary' | 'company'>('date')
+  const [sortBy, setSortBy] = useState<'match' | 'date' | 'salary' | 'company'>('match')
   const [savedOnly, setSavedOnly] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
@@ -62,29 +76,44 @@ export const Opportunities: React.FC = () => {
     { id: 'Remote India', label: 'Remote (India)', pattern: 'remote|india' },
   ]
 
-  // Unique Indian companies discovered
-  const availableCompanies = useMemo(() => {
-    const set = new Set<string>()
-    opportunities.forEach((o) => {
-      if (o.company) set.add(o.company)
-    })
-    return Array.from(set).sort()
-  }, [opportunities])
-
-  const lpaRanges = [
-    { id: 0, label: 'All Salaries' },
-    { id: 8, label: '₹8+ LPA' },
-    { id: 12, label: '₹12+ LPA' },
-    { id: 16, label: '₹16+ LPA' },
-    { id: 20, label: '₹20+ LPA' },
-    { id: 25, label: '₹25+ LPA' },
+  const jobspyBoards = [
+    { id: 'All', label: 'All JobSpy Boards' },
+    { id: 'naukri', label: 'Naukri' },
+    { id: 'indeed', label: 'Indeed (India)' },
+    { id: 'linkedin', label: 'LinkedIn' },
+    { id: 'glassdoor', label: 'Glassdoor' },
   ]
 
-  const recencyOptions = [
-    { id: 'all', label: 'All Dates' },
-    { id: '24h', label: 'Last 24 Hours' },
+  const lpaOptions = [
+    { id: 'All', label: 'All LPA' },
+    { id: '6', label: '₹6+ LPA' },
+    { id: '10', label: '₹10+ LPA' },
+    { id: '14', label: '₹14+ LPA' },
+    { id: '18', label: '₹18+ LPA' },
+  ]
+
+  const freshnessOptions = [
+    { id: 'All', label: 'All Dates' },
+    { id: 'today', label: 'Posted Today' },
     { id: '3d', label: 'Past 3 Days' },
-    { id: '7d', label: 'Past Week' },
+    { id: 'week', label: 'Past Week' },
+  ]
+
+  const famousCompanyOptions = [
+    'All',
+    'Meesho',
+    'CRED',
+    'InMobi',
+    'Mindtickle',
+    'PubMatic',
+    'Druva',
+    'Zeta',
+    'Pocket FM',
+    'Porter',
+    'Qualcomm',
+    'Rubrik',
+    'Amazon',
+    'Bosch',
   ]
 
   const techOptions = [
@@ -92,13 +121,64 @@ export const Opportunities: React.FC = () => {
     'Node.js',
     'JavaScript',
     'TypeScript',
-    'PHP',
     'Python',
     'Java',
-    'AI',
+    'SQL',
     'Full Stack',
   ]
-  const expOptions = ['Internship', 'Fresher', '0–1 years', '1–2 years', '2–3 years']
+  const expBrackets = [
+    { id: 'All', label: 'All Experience' },
+    { id: 'fresher', label: 'Fresher (0–1 Yrs)' },
+    { id: 'entry', label: '0–2 Yrs (Entry Level)' },
+    { id: 'early', label: '1–3 Yrs (Early Career)' },
+    { id: 'mid', label: '3–5 Yrs (Mid-Level)' },
+    { id: 'senior', label: '5+ Yrs (Senior / Lead)' },
+    { id: 'intern', label: 'Internships' },
+  ]
+
+  const matchesExperienceBracket = (opp: Opportunity, bracketId: string): boolean => {
+    if (bracketId === 'All') return true
+    const expLower = (opp.experience || '').toLowerCase()
+    const minE = opp.minExpYears ?? (
+      expLower.includes('intern') ? 0 :
+      expLower.includes('5+') || expLower.includes('senior') || expLower.includes('lead') ? 5 :
+      expLower.includes('3–5') || expLower.includes('3-5') ? 3 :
+      expLower.includes('2–4') || expLower.includes('2-4') ? 2 :
+      expLower.includes('1–3') || expLower.includes('1-3') ? 1 :
+      expLower.includes('0–2') || expLower.includes('0-2') ? 0 :
+      expLower.includes('0–1') || expLower.includes('0-1') || expLower.includes('fresher') ? 0 : 0
+    )
+    const maxE = opp.maxExpYears ?? (
+      expLower.includes('intern') ? 0 :
+      expLower.includes('5+') || expLower.includes('senior') || expLower.includes('lead') ? 10 :
+      expLower.includes('3–5') || expLower.includes('3-5') ? 5 :
+      expLower.includes('2–4') || expLower.includes('2-4') ? 4 :
+      expLower.includes('1–3') || expLower.includes('1-3') ? 3 :
+      expLower.includes('0–2') || expLower.includes('0-2') ? 2 :
+      expLower.includes('0–1') || expLower.includes('0-1') || expLower.includes('fresher') ? 1 : 2
+    )
+
+    if (bracketId === 'intern') {
+      return expLower.includes('intern') || (minE === 0 && maxE === 0)
+    }
+    if (bracketId === 'fresher') {
+      return !expLower.includes('intern') && minE <= 1
+    }
+    if (bracketId === 'entry') {
+      return !expLower.includes('intern') && minE <= 2
+    }
+    if (bracketId === 'early') {
+      return minE <= 3 && maxE >= 1
+    }
+    if (bracketId === 'mid') {
+      return (minE >= 3 && minE <= 5) || (maxE >= 3 && maxE <= 5) || expLower.includes('3–5') || expLower.includes('2–4')
+    }
+    if (bracketId === 'senior') {
+      return minE >= 4 || maxE >= 5 || expLower.includes('senior') || expLower.includes('lead') || expLower.includes('5+')
+    }
+    return true
+  }
+
   const eduOptions = ['MCA', 'BCA', 'B.Tech', 'BE', 'Computer Science', 'IT']
   const stageOptions = ['Seed', 'Pre-Series A', 'Series A', 'Series B+']
 
@@ -115,11 +195,13 @@ export const Opportunities: React.FC = () => {
   const clearAllFilters = () => {
     setSearch('')
     setSelectedHub('All')
+    setSelectedBoard('All')
     setSelectedCompany('All')
-    setMinSalaryLpa(0)
+    setSelectedLpaTier('All')
+    setSelectedExpBracket('All')
+    setSelectedFreshness('All')
     setEligibleOnly(false)
-    setRecencyFilter('all')
-    setSelectedExperience([])
+    setFamousOnly(false)
     setSelectedTech([])
     setSelectedEducation([])
     setSelectedStage([])
@@ -128,96 +210,123 @@ export const Opportunities: React.FC = () => {
     setSavedOnly(false)
   }
 
+  const getJobspyBadge = (opp: Opportunity) => {
+    const site = (opp.jobspySite || opp.source || '').toLowerCase()
+    if (site.includes('naukri')) {
+      return { name: 'JobSpy • Naukri', bg: 'bg-blue-50 text-blue-700 border-blue-200' }
+    }
+    if (site.includes('indeed')) {
+      return { name: 'JobSpy • Indeed India', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
+    }
+    if (site.includes('linkedin')) {
+      return { name: 'JobSpy • LinkedIn', bg: 'bg-sky-50 text-sky-700 border-sky-200' }
+    }
+    if (site.includes('glassdoor')) {
+      return { name: 'JobSpy • Glassdoor', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    }
+    return { name: 'JobSpy Engine', bg: 'bg-slate-100 text-slate-700 border-slate-200' }
+  }
+
   const hasActiveFilters =
     search ||
     selectedHub !== 'All' ||
+    selectedBoard !== 'All' ||
     selectedCompany !== 'All' ||
-    minSalaryLpa > 0 ||
+    selectedLpaTier !== 'All' ||
+    selectedExpBracket !== 'All' ||
+    selectedFreshness !== 'All' ||
     eligibleOnly ||
-    recencyFilter !== 'all' ||
-    selectedExperience.length > 0 ||
+    famousOnly ||
     selectedTech.length > 0 ||
     selectedEducation.length > 0 ||
     selectedStage.length > 0 ||
     remoteOnly ||
-    minMatch > 0 ||
-    savedOnly
+    savedOnly ||
+    minMatch > 0
 
-  // Filter & Sort Logic
+  // Filtered and Sorted Opportunities
   const filteredOpportunities = useMemo(() => {
     return opportunities
       .filter((opp) => {
-        // Indian Hub filter
+        // Search Term
+        if (search) {
+          const q = search.toLowerCase()
+          const matched =
+            opp.role.toLowerCase().includes(q) ||
+            opp.company.toLowerCase().includes(q) ||
+            opp.description.toLowerCase().includes(q) ||
+            opp.technologies.some((t) => t.toLowerCase().includes(q)) ||
+            opp.location.toLowerCase().includes(q)
+          if (!matched) return false
+        }
+
+        // JobSpy Board
+        if (selectedBoard !== 'All') {
+          const b = selectedBoard.toLowerCase()
+          const site = (opp.jobspySite || opp.source || '').toLowerCase()
+          if (!site.includes(b)) return false
+        }
+
+        // Indian IT Hub
         if (selectedHub !== 'All') {
-          const hubDef = indianHubs.find((h) => h.id === selectedHub)
-          if (hubDef && hubDef.pattern) {
-            const reg = new RegExp(hubDef.pattern, 'i')
+          const hubObj = indianHubs.find((h) => h.id === selectedHub)
+          if (hubObj && hubObj.pattern) {
+            const reg = new RegExp(hubObj.pattern, 'i')
             if (!reg.test(opp.location)) return false
           }
         }
 
-        // Famous Company filter
-        if (selectedCompany !== 'All' && opp.company.toLowerCase() !== selectedCompany.toLowerCase()) {
+        // Salary in LPA
+        if (selectedLpaTier !== 'All') {
+          const minRequired = parseFloat(selectedLpaTier)
+          const oppLpa = opp.salaryLpa || opp.salaryMaxLpa || opp.salaryMinLpa || 0
+          if (oppLpa < minRequired) return false
+        }
+
+        // Posting Freshness
+        if (selectedFreshness !== 'All') {
+          const now = Date.now()
+          const ageHours = (now - opp.postedTimestamp) / (1000 * 60 * 60)
+          if (selectedFreshness === 'today' && ageHours > 24) return false
+          if (selectedFreshness === '3d' && ageHours > 72) return false
+          if (selectedFreshness === 'week' && ageHours > 168) return false
+        }
+
+        // MCA / Fresher Eligibility
+        if (eligibleOnly && !opp.eligibility?.isEligible) {
           return false
         }
 
-        // Salary in LPA filter
-        if (minSalaryLpa > 0) {
-          const jobMax = opp.salaryLpaMax || opp.salaryLpaMin || 0
-          if (jobMax < minSalaryLpa) return false
+        // Top Company Tier
+        if (famousOnly && !opp.isFamousCompany) {
+          return false
         }
 
-        // Eligibility Criteria filter (MCA / Fresher / Early Career)
-        if (eligibleOnly) {
-          const isElig = opp.eligibility
-            ? opp.eligibility.isEligible
-            : (opp.experience.includes('Fresher') || opp.experience.includes('0–') || opp.experience.includes('1–2') || opp.experience.includes('Intern'))
-          if (!isElig) return false
-        }
-
-        // Recent Date & Time filter
-        if (recencyFilter !== 'all') {
-          const ageMs = Date.now() - opp.postedTimestamp
-          if (recencyFilter === '24h' && ageMs > 24 * 3600 * 1000) return false
-          if (recencyFilter === '3d' && ageMs > 3 * 24 * 3600 * 1000) return false
-          if (recencyFilter === '7d' && ageMs > 7 * 24 * 3600 * 1000) return false
-        }
-
-        // Search
-        if (search) {
-          const q = search.toLowerCase()
-          const matches =
-            opp.company.toLowerCase().includes(q) ||
-            opp.role.toLowerCase().includes(q) ||
-            opp.location.toLowerCase().includes(q) ||
-            opp.salaryRange?.toLowerCase().includes(q) ||
-            opp.technologies.some((t) => t.toLowerCase().includes(q))
-          if (!matches) return false
+        // Company filter
+        if (selectedCompany !== 'All') {
+          if (!opp.company.toLowerCase().includes(selectedCompany.toLowerCase())) {
+            return false
+          }
         }
 
         // Remote
         if (remoteOnly && !opp.remote) return false
 
-        // Saved only
+        // Saved
         if (savedOnly && !savedJobIds.has(opp.id)) return false
 
-        // Min Match Score
-        if (minMatch > 0 && opp.matchScore < minMatch) return false
+        // Minimum match score
+        if (opp.matchScore < minMatch) return false
 
-        // Experience
-        if (
-          selectedExperience.length > 0 &&
-          !selectedExperience.some((exp) => opp.experience.includes(exp))
-        ) {
-          return false
+        // Required Experience Bracket
+        if (selectedExpBracket !== 'All') {
+          if (!matchesExperienceBracket(opp, selectedExpBracket)) return false
         }
 
-        // Tech
+        // Tech stack
         if (
           selectedTech.length > 0 &&
-          !selectedTech.some((t) =>
-            opp.technologies.some((tech) => tech.toLowerCase().includes(t.toLowerCase()))
-          )
+          !selectedTech.some((t) => opp.technologies.includes(t))
         ) {
           return false
         }
@@ -233,9 +342,9 @@ export const Opportunities: React.FC = () => {
         return true
       })
       .sort((a, b) => {
-        if (sortBy === 'date') return b.postedTimestamp - a.postedTimestamp
-        if (sortBy === 'salary') return (b.salaryLpaMax || b.salaryLpaMin || 0) - (a.salaryLpaMax || a.salaryLpaMin || 0)
         if (sortBy === 'match') return b.matchScore - a.matchScore
+        if (sortBy === 'date') return b.postedTimestamp - a.postedTimestamp
+        if (sortBy === 'salary') return (b.salaryLpa || b.salaryMinLpa || 0) - (a.salaryLpa || a.salaryMinLpa || 0)
         if (sortBy === 'company') return a.company.localeCompare(b.company)
         return 0
       })
@@ -243,14 +352,16 @@ export const Opportunities: React.FC = () => {
     opportunities,
     search,
     selectedHub,
+    selectedBoard,
     selectedCompany,
-    minSalaryLpa,
+    selectedLpaTier,
+    selectedExpBracket,
+    selectedFreshness,
     eligibleOnly,
-    recencyFilter,
+    famousOnly,
     remoteOnly,
     savedOnly,
     minMatch,
-    selectedExperience,
     selectedTech,
     selectedEducation,
     savedJobIds,
@@ -262,21 +373,24 @@ export const Opportunities: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Job Opportunities
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Job Opportunities
+            </h1>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              100% Pure JobSpy Engine
+            </span>
+          </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Discover and prioritize early-career engineering roles that match your profile.
+            Live tech openings harvested in real time from Naukri, Indeed (India), LinkedIn & Glassdoor with authentic LPA compensation and direct ATS application links.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={openDiscoveryModal}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-2 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Run Discovery</span>
-          </button>
+          <div className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/80 flex items-center gap-1.5">
+            <Briefcase className="w-3.5 h-3.5 text-blue-600" />
+            <span>{opportunities.length} Harvested Roles</span>
+          </div>
         </div>
       </div>
 
@@ -305,56 +419,81 @@ export const Opportunities: React.FC = () => {
 
           {/* Quick Toolbar Filters */}
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-            {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${
                 showFilters || hasActiveFilters
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <Filter className="w-3.5 h-3.5" />
               <span>Filters</span>
               {hasActiveFilters && (
-                <span className="w-2 h-2 rounded-full bg-blue-600 ml-0.5"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
               )}
             </button>
 
-            {/* Saved Toggle */}
+            {/* MCA / Fresher Eligible Quick Pill */}
             <button
-              onClick={() => setSavedOnly(!savedOnly)}
-              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-all ${
-                savedOnly
-                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+              onClick={() => setEligibleOnly(!eligibleOnly)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                eligibleOnly
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <Bookmark className="w-3.5 h-3.5" />
+              <CheckCircle2 className={`w-3.5 h-3.5 ${eligibleOnly ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <span>MCA / Fresher Eligible</span>
+            </button>
+
+            {/* Top Unicorns Quick Pill */}
+            <button
+              onClick={() => setFamousOnly(!famousOnly)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                famousOnly
+                  ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-2xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Award className={`w-3.5 h-3.5 ${famousOnly ? 'text-amber-600' : 'text-slate-400'}`} />
+              <span>Top Tech Leaders</span>
+            </button>
+
+            {/* Saved Jobs Toggle */}
+            <button
+              onClick={() => setSavedOnly(!savedOnly)}
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-colors cursor-pointer ${
+                savedOnly
+                  ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-2xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${savedOnly ? 'text-amber-600 fill-amber-500' : 'text-slate-400'}`} />
               <span>Saved ({savedJobIds.size})</span>
             </button>
 
-            {/* Remote Quick Filter */}
+            {/* Remote Only */}
             <button
               onClick={() => setRemoteOnly(!remoteOnly)}
-              className={`px-3 py-2 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                 remoteOnly
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
-              <span>Remote Only</span>
+              Remote Only
             </button>
 
-            {/* Sort Selector */}
+            {/* Sort Dropdown */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
               className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:border-blue-600 transition-colors shadow-2xs"
             >
-              <option value="date">Sort: Most Recent (Date & Time)</option>
-              <option value="salary">Sort: Highest Salary (LPA)</option>
               <option value="match">Sort: Match Score</option>
+              <option value="salary">Sort: Highest Salary (LPA)</option>
+              <option value="date">Sort: Most Recent Date & Time</option>
               <option value="company">Sort: Company Name</option>
             </select>
 
@@ -362,7 +501,7 @@ export const Opportunities: React.FC = () => {
             <div className="hidden sm:flex items-center rounded-xl border border-slate-200 bg-slate-100 p-0.5">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-lg text-xs transition-colors ${
+                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                   viewMode === 'grid'
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -373,7 +512,7 @@ export const Opportunities: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-lg text-xs transition-colors ${
+                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                   viewMode === 'table'
                     ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -386,12 +525,56 @@ export const Opportunities: React.FC = () => {
           </div>
         </div>
 
-        {/* Indian IT Hubs Quick Filter Bar */}
+        {/* JobSpy Source Board Bar */}
         <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 shrink-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <Globe2 className="w-3.5 h-3.5 text-blue-600" />
+              JobSpy Boards:
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {jobspyBoards.map((board) => {
+              const count =
+                board.id === 'All'
+                  ? opportunities.length
+                  : opportunities.filter((o) => {
+                      const site = (o.jobspySite || o.source || '').toLowerCase()
+                      return site.includes(board.id.toLowerCase())
+                    }).length
+              const active = selectedBoard === board.id
+
+              return (
+                <button
+                  key={board.id}
+                  onClick={() => setSelectedBoard(board.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-xs font-semibold'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
+                  }`}
+                >
+                  <span>{board.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      active ? 'bg-slate-800 text-slate-200' : 'bg-white text-slate-500 border border-slate-200/60'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Indian IT Hubs Quick Filter Bar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-indigo-600" />
               Indian IT Hubs:
             </span>
           </div>
@@ -430,159 +613,141 @@ export const Opportunities: React.FC = () => {
           </div>
         </div>
 
-        {/* Famous Companies of India Quick Filter Bar */}
-        {availableCompanies.length > 0 && (
-          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                Famous Companies:
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              <button
-                onClick={() => setSelectedCompany('All')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-                  selectedCompany === 'All'
-                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
-                }`}
-              >
-                <span>All Companies</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    selectedCompany === 'All'
-                      ? 'bg-blue-700 text-blue-100'
-                      : 'bg-white text-slate-500 border border-slate-200/60'
+        {/* Salary in LPA Quick Filter Bar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+              <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
+              Salary (LPA Criteria):
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {lpaOptions.map((opt) => {
+              const active = selectedLpaTier === opt.id
+              const count =
+                opt.id === 'All'
+                  ? opportunities.length
+                  : opportunities.filter((o) => {
+                      const lpa = o.salaryLpa || o.salaryMaxLpa || o.salaryMinLpa || 0
+                      return lpa >= parseFloat(opt.id)
+                    }).length
+
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setSelectedLpaTier(opt.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    active
+                      ? 'bg-emerald-600 text-white shadow-xs font-semibold'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
                   }`}
                 >
-                  {opportunities.length}
-                </span>
-              </button>
-              {availableCompanies.map((comp) => {
-                const count = opportunities.filter((o) => o.company.toLowerCase() === comp.toLowerCase()).length
-                const active = selectedCompany.toLowerCase() === comp.toLowerCase()
+                  <span>{opt.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      active ? 'bg-emerald-700 text-emerald-100' : 'bg-white text-slate-500 border border-slate-200/60'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Required Experience Quick Filter Bar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+              <Briefcase className="w-3.5 h-3.5 text-amber-600" />
+              Required Experience:
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {expBrackets.map((bracket) => {
+              const active = selectedExpBracket === bracket.id
+              const count =
+                bracket.id === 'All'
+                  ? opportunities.length
+                  : opportunities.filter((o) => matchesExperienceBracket(o, bracket.id)).length
+
+              return (
+                <button
+                  key={bracket.id}
+                  onClick={() => setSelectedExpBracket(bracket.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    active
+                      ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
+                  }`}
+                >
+                  <span>{bracket.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      active ? 'bg-amber-700 text-amber-100' : 'bg-white text-slate-500 border border-slate-200/60'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Posting Freshness & Top Companies Bar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 shrink-0">
+              <Clock className="w-3.5 h-3.5 text-blue-500" />
+              Posting Freshness:
+            </span>
+            <div className="flex items-center gap-1.5">
+              {freshnessOptions.map((f) => {
+                const active = selectedFreshness === f.id
                 return (
                   <button
-                    key={comp}
-                    onClick={() => setSelectedCompany(comp)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                    key={f.id}
+                    onClick={() => setSelectedFreshness(f.id)}
+                    className={`px-2.5 py-0.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                       active
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                     }`}
                   >
-                    <span>{comp}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                        active ? 'bg-blue-700 text-blue-100' : 'bg-white text-slate-500 border border-slate-200/60'
-                      }`}
-                    >
-                      {count}
-                    </span>
+                    {f.label}
                   </button>
                 )
               })}
             </div>
           </div>
-        )}
 
-        {/* Salary in LPA Criteria & Recency & Eligibility Bar */}
-        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Salary in LPA Criteria */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 whitespace-nowrap">
-              <span>💰</span> Salary Criteria:
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+              Top Company:
             </span>
-            <div className="flex items-center gap-1">
-              {lpaRanges.map((rng) => {
-                const active = minSalaryLpa === rng.id
-                return (
-                  <button
-                    key={rng.id}
-                    onClick={() => setMinSalaryLpa(rng.id)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      active
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
-                    }`}
-                  >
-                    {rng.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 ml-auto">
-            {/* Recency Date Filter */}
-            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/70">
-              <Clock className="w-3.5 h-3.5 text-slate-400 ml-1" />
-              {recencyOptions.map((opt) => {
-                const active = recencyFilter === opt.id
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => setRecencyFilter(opt.id as any)}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                      active
-                        ? 'bg-white text-slate-900 font-semibold shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* MCA / Fresher Eligible Only Toggle */}
-            <button
-              onClick={() => setEligibleOnly(!eligibleOnly)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                eligibleOnly
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
-              }`}
+            <select
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:border-blue-600"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>MCA / Fresher Eligible</span>
-            </button>
+              {famousCompanyOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c === 'All' ? 'All Famous Companies' : c}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
         {/* Expandable Advanced Filter Panel */}
         {showFilters && (
           <div className="pt-4 border-t border-slate-100 space-y-4 animate-in fade-in duration-150">
-            {/* Experience Pills */}
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                Experience Level
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {expOptions.map((exp) => {
-                  const active = selectedExperience.includes(exp)
-                  return (
-                    <button
-                      key={exp}
-                      onClick={() =>
-                        toggleArrayFilter(exp, selectedExperience, setSelectedExperience)
-                      }
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                        active
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {exp}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
 
-            {/* Technology Pills */}
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Technology
@@ -594,7 +759,7 @@ export const Opportunities: React.FC = () => {
                     <button
                       key={t}
                       onClick={() => toggleArrayFilter(t, selectedTech, setSelectedTech)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                         active
                           ? 'border-blue-600 bg-blue-600 text-white'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -607,7 +772,6 @@ export const Opportunities: React.FC = () => {
               </div>
             </div>
 
-            {/* Education Degree */}
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Target Education
@@ -621,7 +785,7 @@ export const Opportunities: React.FC = () => {
                       onClick={() =>
                         toggleArrayFilter(edu, selectedEducation, setSelectedEducation)
                       }
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                         active
                           ? 'border-indigo-600 bg-indigo-600 text-white'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -634,28 +798,16 @@ export const Opportunities: React.FC = () => {
               </div>
             </div>
 
-            {/* Match Score Minimum */}
-            <div className="flex items-center gap-4 pt-1">
-              <span className="text-xs font-semibold text-slate-600">
-                Minimum Match Score: {minMatch > 0 ? `${minMatch}%` : 'Any'}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+              <span className="text-slate-500">
+                Active filters: {filteredOpportunities.length} of {opportunities.length} roles shown
               </span>
-              <input
-                type="range"
-                min="0"
-                max="95"
-                step="5"
-                value={minMatch}
-                onChange={(e) => setMinMatch(Number(e.target.value))}
-                className="w-48 accent-blue-600"
-              />
-              {hasActiveFilters && (
-                <button
-                  onClick={clearAllFilters}
-                  className="text-xs font-semibold text-rose-600 hover:text-rose-800 ml-auto"
-                >
-                  Clear All Filters
-                </button>
-              )}
+              <button
+                onClick={clearAllFilters}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
+              >
+                Reset All Filters
+              </button>
             </div>
           </div>
         )}
@@ -663,38 +815,40 @@ export const Opportunities: React.FC = () => {
 
       {/* Results Header Count */}
       <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-        <span>
-          Showing <strong className="text-slate-800">{filteredOpportunities.length}</strong>{' '}
-          opportunities
-        </span>
-        <span className="font-mono text-[11px]">Ranked by Profile Fit (MCA / Fresher)</span>
+        <div>
+          Showing <span className="font-bold text-slate-800">{filteredOpportunities.length}</span> opportunities
+          {hasActiveFilters && ' (filtered)'}
+        </div>
+        <div className="text-[11px] font-mono text-slate-400">
+          Ranked by Profile Fit (MCA / Fresher)
+        </div>
       </div>
 
       {/* Empty State */}
       {filteredOpportunities.length === 0 && (
-        <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-            <Filter className="w-6 h-6" />
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <Search className="w-6 h-6" />
           </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">No matching opportunities</h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-              Try adjusting your technology or experience filters, or run a new discovery scan to
-              fetch fresh openings.
+          <div className="max-w-md mx-auto space-y-1">
+            <h3 className="text-base font-bold text-slate-900">No opportunities match criteria</h3>
+            <p className="text-xs text-slate-500">
+              Try resetting your filters or run a live JobSpy scrape for a new role or hub.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={clearAllFilters}
-              className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
             >
-              Reset Filters
+              Clear All Filters
             </button>
             <button
               onClick={openDiscoveryModal}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl cursor-pointer inline-flex items-center gap-1.5"
             >
-              Run Discovery
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Run Discovery</span>
             </button>
           </div>
         </div>
@@ -706,6 +860,7 @@ export const Opportunities: React.FC = () => {
           {filteredOpportunities.map((opp) => {
             const isSaved = savedJobIds.has(opp.id)
             const lead = contacts.find((c) => c.id === opp.contactId)
+            const boardBadge = getJobspyBadge(opp)
 
             return (
               <div
@@ -720,9 +875,17 @@ export const Opportunities: React.FC = () => {
                         {opp.company.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-bold text-slate-900 text-sm truncate">{opp.company}</div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900 text-sm truncate">{opp.company}</span>
+                          {opp.isFamousCompany && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                              <Award className="w-2.5 h-2.5 text-amber-600" />
+                              {opp.companyTier || 'Unicorn'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                           <span className="truncate">{opp.location}</span>
                         </div>
                       </div>
@@ -730,7 +893,7 @@ export const Opportunities: React.FC = () => {
 
                     <button
                       onClick={() => toggleSaveJob(opp.id)}
-                      className={`p-1.5 rounded-lg transition-colors ${
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                         isSaved
                           ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
                           : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
@@ -745,41 +908,55 @@ export const Opportunities: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Role Title & Badges */}
-                  <div className="mt-3.5 space-y-2">
+                  {/* Role Title */}
+                  <div className="mt-3.5">
                     <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors line-clamp-1">
                       {opp.role}
                     </h3>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Salary in LPA */}
-                      <span className="font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1 shadow-2xs">
-                        <span>💰</span>
-                        <span>{opp.salaryRange || '₹12.0 LPA – ₹20.0 LPA'}</span>
-                      </span>
-
-                      {/* Eligibility Badge */}
-                      <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md text-[10px] flex items-center gap-1">
-                        <Check className="w-3 h-3 text-blue-600" />
-                        <span>{opp.eligibility?.summary || 'Eligible: MCA / Freshers'}</span>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 mt-1 text-xs">
                       <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
                         {opp.experience}
                       </span>
                       <span className="text-slate-400">•</span>
                       <span className="text-slate-600 text-[11px]">{opp.employmentType}</span>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                        2024–2026 Batches
-                      </span>
                     </div>
                   </div>
 
+                  {/* JobSpy Source Badge + Salary in LPA & Eligibility Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                    {/* JobSpy Source Badge */}
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${boardBadge.bg}`}>
+                      <Globe2 className="w-3 h-3 shrink-0" />
+                      <span>{boardBadge.name}</span>
+                    </span>
+
+                    {/* Salary LPA */}
+                    <div className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                      <IndianRupee className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>{opp.salaryRange ? opp.salaryRange.replace(/^₹\s*/, '') : (opp.salaryLpa ? `${opp.salaryLpa} LPA` : 'Competitive LPA')}</span>
+                    </div>
+
+                    {/* Eligibility Badge */}
+                    {opp.eligibility?.isEligible ? (
+                      <div
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-emerald-50/90 text-emerald-700 border border-emerald-200"
+                        title={opp.eligibility.reason}
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>MCA / Fresher Fit</span>
+                      </div>
+                    ) : (
+                      <div
+                        className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500"
+                        title={opp.eligibility?.reason}
+                      >
+                        <span>Req: {opp.eligibility?.minExp ?? 0}–{opp.eligibility?.maxExp ?? 3}y</span>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Tech stack badges */}
-                  <div className="flex flex-wrap gap-1.5 mt-3">
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
                     {opp.technologies.slice(0, 4).map((tech) => (
                       <span
                         key={tech}
@@ -796,43 +973,44 @@ export const Opportunities: React.FC = () => {
                   </div>
 
                   {/* Match & Hiring Contact Info */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                     <MatchScoreBadge score={opp.matchScore} size="sm" />
                     {lead ? (
                       <button
                         onClick={() => openContactDrawer(lead)}
-                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Users2 className="w-3.5 h-3.5" />
                         <span>Hiring Lead</span>
                       </button>
                     ) : (
-                      <span className="text-[11px] text-slate-400">Public scan</span>
+                      <span className="text-[11px] text-slate-400">JobSpy Verified</span>
                     )}
                   </div>
                 </div>
 
                 {/* Card Footer Actions */}
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>{opp.postedDate}</span>
-                    {opp.postedRelative && (
-                      <span className="text-slate-400 font-normal">({opp.postedRelative})</span>
-                    )}
+                <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium truncate max-w-[45%]">
+                    <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{opp.postedTimeFormatted || opp.postedDate}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {lead && (
-                      <button
-                        onClick={() => openContactDrawer(lead)}
-                        className="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors"
-                      >
-                        Contact
-                      </button>
-                    )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Direct ATS Link */}
+                    <a
+                      href={opp.directUrl || opp.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Direct application on ATS / platform"
+                    >
+                      <span>Apply</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+
                     <button
                       onClick={() => navigate(`/opportunities/${opp.id}`)}
-                      className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                      className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <span>View</span>
                       <ChevronRight className="w-3 h-3" />
@@ -853,11 +1031,10 @@ export const Opportunities: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-3 px-4">Role & Company</th>
+                  <th className="py-3 px-3">Board (JobSpy)</th>
+                  <th className="py-3 px-3">Location</th>
                   <th className="py-3 px-3">Salary (LPA)</th>
-                  <th className="py-3 px-3">Location & Hub</th>
                   <th className="py-3 px-3">Eligibility</th>
-                  <th className="py-3 px-3">Experience</th>
-                  <th className="py-3 px-3">Tech Stack</th>
                   <th className="py-3 px-3">Match</th>
                   <th className="py-3 px-3">Posted</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -865,49 +1042,66 @@ export const Opportunities: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredOpportunities.map((opp) => {
-                  const lead = contacts.find((c) => c.id === opp.contactId)
                   const isSaved = savedJobIds.has(opp.id)
+                  const boardBadge = getJobspyBadge(opp)
 
                   return (
                     <tr key={opp.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-900">{opp.role}</div>
-                        <div className="text-[11px] text-slate-500 font-semibold">{opp.company}</div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded text-[11px] whitespace-nowrap">
-                          {opp.salaryRange || '₹12.0 LPA – ₹20.0 LPA'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{opp.location}</td>
-                      <td className="py-3 px-3">
-                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-1.5 py-0.5 rounded whitespace-nowrap">
-                          {opp.eligibility?.summary || 'Eligible: MCA / Freshers'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{opp.experience}</td>
-                      <td className="py-3 px-3">
-                        <div className="flex flex-wrap gap-1 max-w-xs">
-                          {opp.technologies.slice(0, 3).map((t) => (
-                            <span
-                              key={t}
-                              className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700"
-                            >
-                              {t}
+                        <div className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                          <span>{opp.company}</span>
+                          {opp.isFamousCompany && (
+                            <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded border border-amber-200">
+                              {opp.companyTier || 'Unicorn'}
                             </span>
-                          ))}
+                          )}
                         </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${boardBadge.bg}`}>
+                          <span>{boardBadge.name}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-600">{opp.location}</td>
+                      <td className="py-3 px-3 font-bold text-emerald-700 whitespace-nowrap">
+                        <div className="flex items-center gap-0.5">
+                          <IndianRupee className="w-3 h-3 text-emerald-600" />
+                          <span>{opp.salaryRange ? opp.salaryRange.replace(/^₹\s*/, '') : (opp.salaryLpa ? `${opp.salaryLpa} LPA` : 'Competitive')}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {opp.eligibility?.isEligible ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Eligible
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">{opp.experience}</span>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         <MatchScoreBadge score={opp.matchScore} size="sm" />
                       </td>
-                      <td className="py-3 px-3 text-slate-500 whitespace-nowrap text-[11px]">
-                        {opp.postedRelative || opp.postedDate}
+                      <td className="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>{opp.postedTimeFormatted || opp.postedDate}</span>
+                        </div>
                       </td>
-                      <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <a
+                          href={opp.directUrl || opp.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 inline-flex items-center gap-1"
+                        >
+                          <span>Apply</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
                         <button
                           onClick={() => toggleSaveJob(opp.id)}
-                          className={`p-1.5 rounded-lg border transition-colors ${
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                             isSaved
                               ? 'border-amber-300 bg-amber-50 text-amber-700'
                               : 'border-slate-200 text-slate-400 hover:text-slate-600'
@@ -917,7 +1111,7 @@ export const Opportunities: React.FC = () => {
                         </button>
                         <button
                           onClick={() => navigate(`/opportunities/${opp.id}`)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800"
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800 cursor-pointer"
                         >
                           Details
                         </button>
