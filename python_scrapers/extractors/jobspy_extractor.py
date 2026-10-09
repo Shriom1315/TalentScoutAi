@@ -28,16 +28,36 @@ FAMOUS_INDIAN_TECH = [
 ]
 
 
-def normalize_location(raw_loc: str) -> str:
-    if not raw_loc or not isinstance(raw_loc, str):
-        return "Bengaluru, Karnataka (India)"
+def normalize_location(raw_loc: str, fallback_loc: str = "India") -> str:
+    fb_lower = (fallback_loc or "").lower()
+    default_target = "Bengaluru, Karnataka (India)"
+    if "pune" in fb_lower:
+        default_target = "Pune, Maharashtra (India)"
+    elif "hyderabad" in fb_lower:
+        default_target = "Hyderabad, Telangana (India)"
+    elif "delhi" in fb_lower or "gurgaon" in fb_lower or "noida" in fb_lower or "ncr" in fb_lower:
+        default_target = "Delhi NCR / Gurgaon (India)"
+    elif "mumbai" in fb_lower:
+        default_target = "Mumbai, Maharashtra (India)"
+    elif "chennai" in fb_lower:
+        default_target = "Chennai, Tamil Nadu (India)"
+    elif "kolkata" in fb_lower:
+        default_target = "Kolkata, West Bengal (India)"
+    elif "ahmedabad" in fb_lower or "gujarat" in fb_lower:
+        default_target = "Ahmedabad, Gujarat (India)"
+    elif "remote" in fb_lower:
+        default_target = "Remote (India)"
+
+    if not raw_loc or not isinstance(raw_loc, str) or raw_loc.strip() == "" or raw_loc.strip().lower() == "nan":
+        return default_target
+
     loc = raw_loc.strip()
     l_lower = loc.lower()
     if "ka" in l_lower or "bangalore" in l_lower or "bengaluru" in l_lower:
         return "Bengaluru, Karnataka (India)"
     if "mh" in l_lower or "pune" in l_lower:
         return "Pune, Maharashtra (India)"
-    if "mumbai" in l_lower or "powai" in l_lower or "bkc" in l_lower:
+    if "mumbai" in l_lower or "powai" in l_lower or "bkc" in l_lower or "thane" in l_lower:
         return "Mumbai, Maharashtra (India)"
     if "hyderabad" in l_lower or "telangana" in l_lower or "cyberabad" in l_lower:
         return "Hyderabad, Telangana (India)"
@@ -45,7 +65,11 @@ def normalize_location(raw_loc: str) -> str:
         return "Delhi NCR / Gurgaon (India)"
     if "chennai" in l_lower or "tamil" in l_lower:
         return "Chennai, Tamil Nadu (India)"
-    if "remote" in l_lower:
+    if "kolkata" in l_lower or "calcutta" in l_lower or "bengal" in l_lower:
+        return "Kolkata, West Bengal (India)"
+    if "ahmedabad" in l_lower or "gandhinagar" in l_lower or "gujarat" in l_lower:
+        return "Ahmedabad, Gujarat (India)"
+    if "remote" in l_lower or "wfh" in l_lower:
         return "Remote (India)"
     if "india" in l_lower:
         return loc
@@ -171,7 +195,7 @@ def scrape_single_query(
             if len(desc) < 30:
                 desc = f"{title} role at {company} located in {loc}. Explore engineering opportunities."
 
-            location_norm = normalize_location(str(row.get('location') or loc))
+            location_norm = normalize_location(str(row.get('location') or loc), fallback_loc=loc)
 
             # Company tiering & famous tags
             comp_lower = company.lower()
@@ -270,12 +294,13 @@ def scrape_with_jobspy(
 
     # Build prioritized list of queries
     search_queries: List[tuple] = []
+    is_pan_india = not location or location.strip().lower() in ["india", "all", "all india", "remote (india)"]
 
     if query and query.strip():
         q = query.strip()
-        loc = location.strip() if location and location.strip() else "Bengaluru, India"
+        loc = location.strip() if not is_pan_india else "Bengaluru, India"
         search_queries.append((q, loc))
-        if not location or "all" in location.lower():
+        if is_pan_india:
             search_queries.extend([
                 (q, "Pune, India"),
                 (q, "Hyderabad, India"),
@@ -286,18 +311,21 @@ def scrape_with_jobspy(
             search_queries.extend([
                 (f"{q} React", loc),
                 (f"{q} Software", loc),
-                (f"{q} Fresher", loc)
+                (f"{q} Fresher", loc),
+                (f"{q} Developer", loc)
             ])
     else:
-        # Standard high-yield Indian IT Hub roles
-        loc_base = location.strip() if (location and "all" not in location.lower()) else None
-        if loc_base:
+        # High-yield Indian IT Hub roles
+        if not is_pan_india:
+            loc_target = location.strip()
             search_queries = [
-                ("Software Engineer", loc_base),
-                ("React Developer", loc_base),
-                ("Full Stack Developer", loc_base),
-                ("Frontend Developer", loc_base),
-                ("Node.js Developer", loc_base),
+                ("Software Engineer", loc_target),
+                ("React Developer", loc_target),
+                ("Full Stack Developer", loc_target),
+                ("Frontend Developer", loc_target),
+                ("Node.js Developer", loc_target),
+                ("Graduate Engineer Trainee", loc_target),
+                ("Software Developer Fresher", loc_target),
             ]
         else:
             search_queries = [
@@ -306,10 +334,8 @@ def scrape_with_jobspy(
                 ("Full Stack Developer", "Hyderabad, India"),
                 ("Frontend Developer", "Bengaluru, India"),
                 ("Backend Developer", "Pune, India"),
-                ("Meesho", "Bengaluru, India"),
-                ("CRED", "Bengaluru, India"),
-                ("Qualcomm", "Hyderabad, India"),
-                ("Druva", "Pune, India"),
+                ("Software Trainee", "Delhi NCR, India"),
+                ("Web Developer", "Mumbai, India"),
             ]
 
     raw_jobs: List[Dict[str, Any]] = []

@@ -82,8 +82,30 @@ export interface Opportunity {
   isMockData?: boolean
   jobspySite?: string
   directUrl?: string
+  verification?: RecruiterVerification
+  trustScore?: number
+  verificationBadge?: string
 }
 
+export interface VerificationSourceResult {
+  name: string
+  status: 'verified' | 'warning' | 'failed'
+  details: string
+}
+
+export interface RecruiterVerification {
+  trustScore: number
+  status: string
+  verificationBadge: string
+  domainAgeYears?: number
+  registrar?: string
+  sslValid?: boolean
+  mxValid?: boolean
+  mailProvider?: string
+  atsDetected?: string
+  sourcesChecked: VerificationSourceResult[]
+  verifiedAt: string
+}
 
 export interface Contact {
   id: string
@@ -110,6 +132,8 @@ export interface Contact {
   provider?: string
   relatedAccounts?: Array<{ platform: string; url: string; type?: string }>
   isMockData?: boolean
+  verification?: RecruiterVerification
+  verificationBadge?: string
 }
 
 export interface Outreach {

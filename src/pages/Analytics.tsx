@@ -127,10 +127,10 @@ export const Analytics: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Pipeline Analytics & Insights
+            TPO Placement Analytics & Campus Intelligence
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Data-driven intelligence dynamically derived from real-time scraped job listings and DNS MX lookups.
+            Department hiring analytics derived from real-time scraped vacancies, verified corporate recruiters, and MCA/B.Tech skill demand.
           </p>
         </div>
         <button

@@ -97,10 +97,10 @@ export const Outreach: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Outreach Campaign Manager
+            Campus Placement Drive Outreach
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Personalized, proof-of-skill pitches prepared for founders and engineering hiring leads.
+            Official college placement drive proposals, pool campus invitations, and corporate HR communications for department students.
           </p>
         </div>
       </div>
@@ -113,15 +113,15 @@ export const Outreach: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900">
-              High-Conversion Proof-of-Skill Model
+              Institutional Placement Drive Protocol
             </div>
             <div className="text-[11px] text-slate-500">
-              TalentScout AI never performs bulk blind emailing. All messages include working prototype links and are designed for one-to-one professional engagement.
+              Official department invitations personalized with student batch strengths, verified technologies, and direct interview scheduling.
             </div>
           </div>
         </div>
         <div className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200 shrink-0">
-          Zero Automated Spam
+          Official TPO Outreach
         </div>
       </div>
 

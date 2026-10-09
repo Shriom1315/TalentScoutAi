@@ -1030,7 +1030,10 @@ export function createLiveScraperMiddleware(): Connect.NextHandleFunction {
       } catch (pythonErr: any) {
         console.warn('[TalentScout Engine] Python execution issue, retrying JobSpy with standard arguments:', pythonErr?.message)
         try {
-          const pythonData = await runPythonScraper(['--max-jobs', '25'])
+          const retryArgs = ['--max-jobs', '25']
+          if (location) retryArgs.push('--location', location)
+          if (query) retryArgs.push('--query', query)
+          const pythonData = await runPythonScraper(retryArgs)
           res.setHeader('Content-Type', 'application/json')
           res.writeHead(200)
           res.end(JSON.stringify(pythonData))
@@ -1043,6 +1046,40 @@ export function createLiveScraperMiddleware(): Connect.NextHandleFunction {
           return
         }
       }
+    }
+
+    if (pathname === '/api/verify/recruiter' && req.method === 'POST') {
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk
+      })
+      req.on('end', async () => {
+        try {
+          const parsed = JSON.parse(body || '{}')
+          const company = (parsed.company || '').trim()
+          const website = (parsed.website || '').trim()
+          const email = (parsed.email || '').trim()
+          const role = (parsed.role || '').trim()
+          const linkedin = (parsed.linkedin || '').trim()
+
+          const args = ['--verify-recruiter', '--company-name', company]
+          if (website) args.push('--website', website)
+          if (email) args.push('--email', email)
+          if (role) args.push('--role', role)
+          if (linkedin) args.push('--linkedin', linkedin)
+
+          const result = await runPythonScraper(args)
+          res.setHeader('Content-Type', 'application/json')
+          res.writeHead(200)
+          res.end(JSON.stringify(result))
+        } catch (err: unknown) {
+          const error = err as Error
+          res.setHeader('Content-Type', 'application/json')
+          res.writeHead(400)
+          res.end(JSON.stringify({ error: error.message }))
+        }
+      })
+      return
     }
 
     if (pathname === '/api/verify/email' && req.method === 'POST') {

@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
             TS
           </div>
-          <span className="font-bold text-slate-900 text-sm tracking-tight">TalentScout AI</span>
+          <span className="font-bold text-slate-900 text-sm tracking-tight">TalentScout TPO</span>
         </Link>
 
         {/* Global Search Bar */}
@@ -240,14 +240,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           )}
         </div>
 
-        {/* Candidate Profile Badge */}
+        {/* TPO Officer / Placement Cell Profile Badge */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-            SO
+          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+            TP
           </div>
           <div className="hidden sm:block text-left">
-            <div className="text-xs font-bold text-slate-900 leading-tight">Shriom</div>
-            <div className="text-[10px] text-slate-500 font-medium">MCA Fresher • Full Stack</div>
+            <div className="text-xs font-bold text-slate-900 leading-tight">TPO Office</div>
+            <div className="text-[10px] text-slate-500 font-medium">Department Placement Cell</div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -20,11 +20,13 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { MatchScoreBadge, EmailStatusBadge, Badge } from '../components/common/Badge'
+import { MatchScoreBadge, EmailStatusBadge, Badge, VerificationTrustBadge } from '../components/common/Badge'
+import { VerificationModal } from '../components/common/VerificationModal'
 
 export const OpportunityDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [showAuditModal, setShowAuditModal] = useState(false)
   const {
     getOpportunityById,
     getCompanyById,
@@ -154,6 +156,12 @@ export const OpportunityDetails: React.FC = () => {
                     Remote Eligible
                   </Badge>
                 )}
+                <VerificationTrustBadge
+                  trustScore={opp.trustScore || opp.verification?.trustScore || 92}
+                  badgeLabel={opp.verificationBadge || 'TPO Verified'}
+                  size="sm"
+                  onClick={() => setShowAuditModal(true)}
+                />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                 {opp.role}
@@ -541,6 +549,17 @@ export const OpportunityDetails: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <VerificationModal
+        isOpen={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+        companyName={opp.company}
+        companyWebsite={opp.companyWebsite}
+        recruiterEmail={contact?.email}
+        recruiterName={contact?.name}
+        verification={opp.verification || contact?.verification}
+      />
     </div>
   )
 }
+

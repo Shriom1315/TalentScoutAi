@@ -111,6 +111,41 @@ def api_enrich_contact(payload: EnrichContactRequest):
         )
 
 
+class VerifyRecruiterRequest(BaseModel):
+    company: str
+    website: Optional[str] = ""
+    email: Optional[str] = ""
+    name: Optional[str] = ""
+    role: Optional[str] = ""
+    linkedin: Optional[str] = ""
+    jobUrl: Optional[str] = ""
+    source: Optional[str] = "JobSpy"
+    description: Optional[str] = ""
+
+
+@app.post("/api/verify/recruiter")
+def api_verify_recruiter(payload: VerifyRecruiterRequest):
+    try:
+        from python_scrapers.verifiers.recruiter_verifier import verify_recruiter_and_job
+        result = verify_recruiter_and_job(
+            company_name=payload.company,
+            website=payload.website or "",
+            recruiter_email=payload.email or "",
+            recruiter_name=payload.name or "",
+            recruiter_role=payload.role or "",
+            linkedin_url=payload.linkedin or "",
+            job_url=payload.jobUrl or "",
+            source=payload.source or "JobSpy",
+            description=payload.description or "",
+        )
+        return result
+    except Exception as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Recruiter verification failed: {str(e)}"},
+        )
+
+
 # Serve Built React Frontend if dist/ folder exists (for all-in-one free Render hosting)
 DIST_DIR = os.path.join(PROJECT_DIR, "dist")
 if os.path.exists(DIST_DIR):

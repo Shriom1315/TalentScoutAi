@@ -118,7 +118,7 @@ export const ContactDrawer: React.FC = () => {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
               Contact Intelligence
             </span>
-            <h3 className="text-lg font-bold text-slate-900 mt-1">Verified Decision Maker</h3>
+            <h3 className="text-lg font-bold text-slate-900 mt-1">Corporate Recruiter — TPO Verified</h3>
           </div>
           <button
             onClick={closeContactDrawer}
@@ -407,10 +407,10 @@ export const ContactDrawer: React.FC = () => {
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center gap-3">
           <button
             onClick={handlePrepareOutreach}
-            className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-blue-500/10"
           >
             <Send className="w-4 h-4" />
-            <span>Generate Outreach</span>
+            <span>Campus Drive Invite</span>
           </button>
           <button
             onClick={closeContactDrawer}

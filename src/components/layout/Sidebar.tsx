@@ -21,11 +21,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   const { lastScanText, isDiscovering, openDiscoveryModal } = useApp()
 
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Opportunities', path: '/opportunities', icon: Briefcase },
-    { name: 'Contacts', path: '/contacts', icon: Users2 },
-    { name: 'Outreach', path: '/outreach', icon: Send },
-    { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'TPO Command Center', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Job Openings', path: '/opportunities', icon: Briefcase },
+    { name: 'Recruiter Directory', path: '/contacts', icon: Users2 },
+    { name: 'Campus Outreach', path: '/outreach', icon: Send },
+    { name: 'Placement Analytics', path: '/analytics', icon: BarChart3 },
   ]
 
   return (
@@ -38,10 +38,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
         <div>
           <div className="font-extrabold text-slate-900 text-base tracking-tight leading-tight flex items-center gap-1.5">
             <span>TalentScout</span>
-            <span className="text-blue-600 font-bold">AI</span>
+            <span className="text-blue-600 font-bold">TPO</span>
           </div>
           <div className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">
-            Intelligence Engine
+            Placement Cell Hub
           </div>
         </div>
       </div>

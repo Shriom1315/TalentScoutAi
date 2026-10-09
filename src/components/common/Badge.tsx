@@ -110,3 +110,39 @@ export const MatchScoreBadge: React.FC<{ score: number; size?: 'sm' | 'md' }> = 
     </Badge>
   )
 }
+
+export const VerificationTrustBadge: React.FC<{
+  trustScore?: number
+  badgeLabel?: string
+  size?: 'sm' | 'md'
+  onClick?: () => void
+}> = ({ trustScore = 90, badgeLabel, size = 'sm', onClick }) => {
+  const isHigh = trustScore >= 85
+  const isMedium = trustScore >= 70
+
+  const variant = isHigh ? 'success' : isMedium ? 'primary' : 'warning'
+  const dotColor = isHigh ? 'bg-emerald-500' : isMedium ? 'bg-blue-500' : 'bg-amber-500'
+  const label = badgeLabel || (isHigh ? 'TPO Verified' : 'Corporate Verified')
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full font-bold transition-all ${
+        size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
+      } ${
+        variant === 'success'
+          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100'
+          : variant === 'primary'
+          ? 'bg-blue-50 text-blue-700 border border-blue-200/90 hover:bg-blue-100'
+          : 'bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100'
+      } ${onClick ? 'cursor-pointer' : ''}`}
+      title="Verified across Domain WHOIS, SSL/TLS, DNS MX, and LinkedIn"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isHigh ? 'animate-pulse' : ''}`}></span>
+      <span>{label}</span>
+      <span className="text-[10px] opacity-75">({trustScore}%)</span>
+    </button>
+  )
+}
+

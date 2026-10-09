@@ -26,9 +26,14 @@ import {
   Radio,
   Flame,
   Briefcase,
+  FileSpreadsheet,
+  GraduationCap,
+  ShieldCheck,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { MatchScoreBadge, Badge } from '../components/common/Badge'
+import { MatchScoreBadge, Badge, VerificationTrustBadge } from '../components/common/Badge'
+import { VerificationModal } from '../components/common/VerificationModal'
+import { exportOpportunitiesToCsv } from '../utils/exportCsv'
 import { Opportunity } from '../types'
 
 export const Opportunities: React.FC = () => {
@@ -43,11 +48,19 @@ export const Opportunities: React.FC = () => {
     openDiscoveryModal,
     runDiscovery,
     isDiscovering,
+    showToast,
   } = useApp()
 
   // Filter States
   const [search, setSearch] = useState('')
   const [selectedHub, setSelectedHub] = useState<string>('All')
+  const [selectedAudit, setSelectedAudit] = useState<{
+    companyName: string
+    website?: string
+    recruiterEmail?: string
+    recruiterName?: string
+    verification?: any
+  } | null>(null)
   const [selectedBoard, setSelectedBoard] = useState<string>('All')
   const [selectedCompany, setSelectedCompany] = useState<string>('All')
   const [selectedLpaTier, setSelectedLpaTier] = useState<string>('All')
@@ -73,7 +86,7 @@ export const Opportunities: React.FC = () => {
     { id: 'Delhi NCR', label: 'Delhi NCR / Gurgaon', pattern: 'delhi|gurgaon|gurugram|noida' },
     { id: 'Mumbai', label: 'Mumbai', pattern: 'mumbai' },
     { id: 'Chennai', label: 'Chennai', pattern: 'chennai' },
-    { id: 'Remote India', label: 'Remote (India)', pattern: 'remote|india' },
+    { id: 'Remote India', label: 'Remote', pattern: 'remote|wfh|work from home' },
   ]
 
   const jobspyBoards = [
@@ -272,7 +285,11 @@ export const Opportunities: React.FC = () => {
           const hubObj = indianHubs.find((h) => h.id === selectedHub)
           if (hubObj && hubObj.pattern) {
             const reg = new RegExp(hubObj.pattern, 'i')
-            if (!reg.test(opp.location)) return false
+            if (hubObj.id.includes('Remote')) {
+              if (!opp.remote && !reg.test(opp.location)) return false
+            } else {
+              if (!reg.test(opp.location)) return false
+            }
           }
         }
 
@@ -374,19 +391,35 @@ export const Opportunities: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Job Opportunities
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <GraduationCap className="w-7 h-7 text-blue-600" />
+              Current Job Openings — Department Feed
             </h1>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              100% Pure JobSpy Engine
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              TPO Verified Vacancies
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Live tech openings harvested in real time from Naukri, Indeed (India), LinkedIn & Glassdoor with authentic LPA compensation and direct ATS application links.
+            Live tech openings harvested in real time across Naukri, Indeed (India), LinkedIn & Glassdoor with authentic LPA compensation and direct recruiter contact points.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (opportunities.length === 0) {
+                showToast('No Data', 'No job openings available to export.', 'warning')
+                return
+              }
+              exportOpportunitiesToCsv(opportunities, `TPO_Live_Job_Openings.csv`)
+              showToast('Export Complete', `Exported ${opportunities.length} live job openings to CSV.`, 'success')
+            }}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer shadow-blue-500/10"
+            title="Export job postings to CSV for student placement sharing"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Export Openings (CSV)</span>
+          </button>
           <div className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/80 flex items-center gap-1.5">
             <Briefcase className="w-3.5 h-3.5 text-blue-600" />
             <span>{opportunities.length} Harvested Roles</span>
@@ -1124,6 +1157,19 @@ export const Opportunities: React.FC = () => {
           </div>
         </div>
       )}
+
+      {selectedAudit && (
+        <VerificationModal
+          isOpen={Boolean(selectedAudit)}
+          onClose={() => setSelectedAudit(null)}
+          companyName={selectedAudit.companyName}
+          companyWebsite={selectedAudit.website}
+          recruiterEmail={selectedAudit.recruiterEmail}
+          recruiterName={selectedAudit.recruiterName}
+          verification={selectedAudit.verification}
+        />
+      )}
     </div>
   )
 }
+

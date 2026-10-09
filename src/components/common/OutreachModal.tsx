@@ -112,17 +112,17 @@ export const OutreachModal: React.FC = () => {
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm">
-                AI Personalized Outreach Assistant
+                TPO Campus Placement Proposal Generator
               </h3>
               <p className="text-xs text-slate-500">
-                To: {contact?.name || 'Contact'} ({contact?.role || 'Lead'}) •{' '}
+                To: {contact?.name || 'Recruiter'} ({contact?.role || 'Talent Acquisition'}) •{' '}
                 {opp?.company || 'Company'}
               </p>
             </div>
           </div>
           <button
             onClick={closeOutreachModal}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

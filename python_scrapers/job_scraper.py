@@ -22,6 +22,7 @@ if PROJECT_DIR not in sys.path:
 from python_scrapers.extractors.jobspy_extractor import scrape_with_jobspy
 from python_scrapers.extractors.contact_harvester import harvest_company_contacts
 from python_scrapers.verifiers.dns_verifier import verify_email_with_dns
+from python_scrapers.verifiers.recruiter_verifier import verify_recruiter_and_job
 from python_scrapers.scoring.profile_matcher import (
     score_job_alignment,
     generate_prototype_brief,
@@ -30,6 +31,59 @@ from python_scrapers.scoring.profile_matcher import (
     format_posting_datetime,
 )
 
+CITY_ALIAS_MAP = {
+    "bengaluru": ["bengaluru", "bangalore", "karnataka", "blr", "whitefield", "electronic city", "koramangala", "bellandur", "marathahalli"],
+    "pune": ["pune", "hinjewadi", "magarpatta", "kharadi", "baner", "viman nagar", "hadapsar", "maharashtra", "wakad", "kothrud"],
+    "hyderabad": ["hyderabad", "secunderabad", "telangana", "hitec city", "gachibowli", "madhapur", "cyberabad", "kondapur", "kukatpally"],
+    "delhi ncr": ["delhi", "gurgaon", "gurugram", "noida", "greater noida", "faridabad", "ghaziabad", "ncr", "cyber city"],
+    "mumbai": ["mumbai", "navi mumbai", "thane", "powai", "bkc", "bandra", "andheri", "goregaon", "malad"],
+    "chennai": ["chennai", "madras", "tamil nadu", "omr", "siruseri", "tidel", "guindy", "sholinganallur"],
+    "kolkata": ["kolkata", "calcutta", "salt lake", "new town", "west bengal", "sector v"],
+    "ahmedabad": ["ahmedabad", "gandhinagar", "gift city", "gujarat"],
+    "remote": ["remote", "work from home", "wfh", "anywhere"],
+}
+
+
+def matches_requested_city(job: Dict[str, Any], requested_city: str) -> bool:
+    """Strictly validates whether a job matches the user-specified city."""
+    req_clean = (requested_city or "").strip().lower()
+    if not req_clean or req_clean in ["india", "all", "all india", "pan india"]:
+        return True
+
+    # Identify primary target key
+    target_key = None
+    for key, aliases in CITY_ALIAS_MAP.items():
+        if key in req_clean or any(a in req_clean for a in aliases):
+            target_key = key
+            break
+
+    if not target_key:
+        target_aliases = [req_clean]
+    else:
+        target_aliases = CITY_ALIAS_MAP[target_key]
+
+    j_loc = (job.get("location") or "").lower()
+    j_desc = (job.get("description") or "").lower()[:200]
+    j_title = (job.get("title") or "").lower()
+    j_text = f"{j_loc} {j_desc} {j_title}"
+
+    # Check if job matches requested city
+    has_target = any(a in j_text for a in target_aliases)
+    if has_target:
+        return True
+
+    # If looking for a specific physical city, reject jobs explicitly locked to other hubs
+    other_hubs = [k for k in CITY_ALIAS_MAP.keys() if k != target_key and k != "remote"]
+    for oh in other_hubs:
+        if any(a in j_loc for a in CITY_ALIAS_MAP[oh]):
+            # Belongs to a different city!
+            return False
+
+    # Check if remote
+    if job.get("remote"):
+        return True
+
+    return False
 
 def run_full_pipeline(
     query: str = "",
@@ -40,7 +94,8 @@ def run_full_pipeline(
 ) -> Dict[str, Any]:
     """
     Executes real-time job scraping exclusively via python-jobspy across
-    Naukri, Indeed (India), LinkedIn, and Glassdoor.
+    Naukri, Indeed (India), LinkedIn, and Glassdoor with strict city filtering
+    and multi-source recruiter verification.
     """
     start_time = time.time()
 
@@ -48,7 +103,7 @@ def run_full_pipeline(
     if not sites:
         sites = ["naukri", "indeed", "linkedin", "glassdoor"]
 
-    # Scrape exclusively via JobSpy
+    # Scrape via JobSpy
     raw_jobs = scrape_with_jobspy(
         query=query,
         location=location,
@@ -57,7 +112,7 @@ def run_full_pipeline(
         hours_old=hours_old
     )
 
-    # Filter by query if user explicitly specified a search term
+    # 1. Filter by Query if provided
     filtered_jobs = raw_jobs
     if query and query.strip():
         q = query.strip().lower()
@@ -66,19 +121,18 @@ def run_full_pipeline(
             text = f"{j.get('title', '')} {j.get('company', '')} {j.get('description', '')} {j.get('location', '')} {' '.join(j.get('tags', []))}".lower()
             if q in text:
                 matched.append(j)
-        if matched:
-            filtered_jobs = matched
+        filtered_jobs = matched
 
-    # Prioritize Indian IT Hubs
-    INDIAN_HUBS = ['bengaluru', 'bangalore', 'hyderabad', 'pune', 'delhi ncr', 'gurgaon', 'gurugram', 'noida', 'mumbai', 'chennai', 'remote (india)', 'india']
-    def is_indian_hub(loc):
-        l = (loc or '').lower()
-        return any(h in l for h in INDIAN_HUBS)
+    # 2. STRICT City Filter: Enforce requested city to prevent cross-city leakage
+    loc_clean = (location or "").strip().lower()
+    is_pan_india = not loc_clean or loc_clean in ["india", "all", "all india", "pan india"]
+
+    if not is_pan_india:
+        filtered_jobs = [j for j in filtered_jobs if matches_requested_city(j, location)]
 
     # Deduplicate by company + role title
     seen_keys = set()
     unique_jobs: List[Dict[str, Any]] = []
-    filtered_jobs.sort(key=lambda j: (1 if is_indian_hub(j.get('location')) else 0), reverse=True)
 
     for j in filtered_jobs:
         company_slug = re.sub(r"[^a-z0-9]", "", j.get("company", "").lower())
@@ -240,6 +294,27 @@ def run_full_pipeline(
             "relatedAccounts": harvest_data.get("relatedAccounts", []),
         }
 
+        # Multi-Source Recruiter & Company Website Verification
+        verification_data = verify_recruiter_and_job(
+            company_name=company_name,
+            website=canonical_website,
+            recruiter_email=contact_email,
+            recruiter_name=contact["name"],
+            recruiter_role=contact["role"],
+            linkedin_url=contact["linkedinUrl"],
+            job_url=post_url,
+            source=raw.get("source", "JobSpy Engine"),
+            description=description,
+        )
+
+        opp["verification"] = verification_data
+        opp["trustScore"] = verification_data.get("trustScore", 85)
+        opp["verificationBadge"] = verification_data.get("verificationBadge", "TPO Verified Recruiter")
+
+        contact["verification"] = verification_data
+        contact["confidence"] = verification_data.get("trustScore", 85)
+        contact["verificationBadge"] = verification_data.get("verificationBadge", "TPO Verified Recruiter")
+
         opportunities.append(opp)
         companies.append(comp)
         contacts.append(contact)
@@ -276,8 +351,12 @@ def main():
     parser.add_argument("--max-jobs", type=int, default=30, help="Max jobs to harvest")
     parser.add_argument("--hours-old", type=int, default=168, help="Max age in hours")
     parser.add_argument("--verify-email", type=str, default="", help="Verify email via dnspython")
+    parser.add_argument("--verify-recruiter", action="store_true", help="Run multi-source recruiter verification")
     parser.add_argument("--enrich-company", type=str, default="", help="Harvest contact & social info for company")
+    parser.add_argument("--company-name", type=str, default="", help="Company name for verification")
     parser.add_argument("--website", type=str, default="", help="Optional company website")
+    parser.add_argument("--email", type=str, default="", help="Recruiter email")
+    parser.add_argument("--linkedin", type=str, default="", help="LinkedIn URL")
     parser.add_argument("--role", type=str, default="Software Engineer", help="Role title")
 
     args = parser.parse_args()
@@ -285,6 +364,18 @@ def main():
     # 1. Direct email verification
     if args.verify_email:
         res = verify_email_with_dns(args.verify_email)
+        print(json.dumps(res, indent=2))
+        return
+
+    # 2. Multi-source recruiter verification
+    if args.verify_recruiter:
+        res = verify_recruiter_and_job(
+            company_name=args.company_name or args.enrich_company or "Company",
+            website=args.website,
+            recruiter_email=args.email,
+            recruiter_role=args.role,
+            linkedin_url=args.linkedin
+        )
         print(json.dumps(res, indent=2))
         return
 
