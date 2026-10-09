@@ -5,33 +5,54 @@ Powered by dnspython and email-validator.
 
 from typing import Dict, Any, List
 import dns.resolver
-import email_validator
+try:
+    import email_validator
+    HAS_EMAIL_VALIDATOR = True
+except ImportError:
+    HAS_EMAIL_VALIDATOR = False
+    email_validator = None
 
 
 def verify_email_with_dns(email_address: str) -> Dict[str, Any]:
     """
     Verifies an email address using:
-    1. Syntax & domain normalization via email-validator.
+    1. Syntax & domain normalization via email-validator (or standard RFC regex fallback).
     2. Real-time DNS MX lookup via dnspython.
     3. Mail gateway provider classification.
     """
     clean_email = email_address.strip().lower()
 
-    # 1. Syntax check with email-validator
-    try:
-        validated = email_validator.validate_email(clean_email, check_deliverability=False)
-        domain = validated.domain
-        normalized_email = validated.normalized
-    except email_validator.EmailNotValidError as e:
-        return {
-            "email": clean_email,
-            "mxValid": False,
-            "exchanges": [],
-            "provider": "Invalid Syntax",
-            "confidence": 20,
-            "notes": f"Invalid email syntax: {str(e)}",
-            "status": "Needs verification",
-        }
+    # 1. Syntax check
+    if HAS_EMAIL_VALIDATOR and email_validator:
+        try:
+            validated = email_validator.validate_email(clean_email, check_deliverability=False)
+            domain = validated.domain
+            normalized_email = validated.normalized
+        except email_validator.EmailNotValidError as e:
+            return {
+                "email": clean_email,
+                "mxValid": False,
+                "exchanges": [],
+                "provider": "Invalid Syntax",
+                "confidence": 20,
+                "notes": f"Invalid email syntax: {str(e)}",
+                "status": "Needs verification",
+            }
+    else:
+        import re
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", clean_email):
+            return {
+                "email": clean_email,
+                "mxValid": False,
+                "exchanges": [],
+                "provider": "Invalid Syntax",
+                "confidence": 20,
+                "notes": "Invalid email syntax format",
+                "status": "Needs verification",
+            }
+        domain = clean_email.split("@")[-1]
+        normalized_email = clean_email
+
 
     # 2. DNS MX lookup via dnspython
     try:
